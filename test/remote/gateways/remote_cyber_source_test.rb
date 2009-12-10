@@ -108,6 +108,12 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_success capture
   end
   
+  def test_authorize_in_gbp_instead_of_the_default_usd
+    auth = @gateway.authorize(@amount, @credit_card, @options.merge!(:currency => "GBP"))
+    assert_success auth
+    assert_equal 'Successful transaction', auth.message
+  end
+  
   def test_successful_authorization_and_failed_capture
     assert auth = @gateway.authorize(@amount, @credit_card, @options)
     assert_success auth
