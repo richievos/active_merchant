@@ -14,6 +14,7 @@ module ActiveMerchant #:nodoc:
     # * If you want to calculate VAT for overseas customers you must supply a registration number in the options hash as vat_reg_number. 
     # * productCode is a value in the line_items hash that is used to tell CyberSource what kind of item you are selling.  It is used when calculating tax/VAT.
     # * All transactions use dollar values.
+    # * In order to transact in multiple currencies, the desired currencies must be enabled on your CyberSource account. This can be accomplished by contacting CyberSource support (a link is available from the Business Center).
     class CyberSourceGateway < Gateway
       TEST_URL = 'https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor'
       LIVE_URL = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
@@ -103,9 +104,13 @@ module ActiveMerchant #:nodoc:
       
       # Request an authorization for an amount from CyberSource 
       #
-      # You must supply an :order_id in the options hash 
+      # You must supply an :order_id and an :email in the options hash.
+      #
+      # You may further pass a :currency option. This should be a 3-letter code (as noted in
+      # http://apps.cybersource.com/library/documentation/sbc/quickref/currencies.pdf) that
+      # details the currency of this transaction. If this is left out, the default is "USD".
       def authorize(money, creditcard, options = {})
-        requires!(options,  :order_id, :email)
+        requires!(options, :order_id, :email)
         setup_address_hash(options)
         commit(build_auth_request(money, creditcard, options), options )
       end
@@ -116,8 +121,8 @@ module ActiveMerchant #:nodoc:
         commit(build_capture_request(money, authorization, options), options)
       end
 
-      # Purchase is an auth followed by a capture
-      # You must supply an order_id in the options hash  
+      # Purchase is an auth followed by a capture. Note that this call follows the same 
+      # restrictions and allowances of options as authorize.
       def purchase(money, creditcard, options = {})
         requires!(options, :order_id, :email)
         setup_address_hash(options)
