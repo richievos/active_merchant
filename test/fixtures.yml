@@ -33,8 +33,8 @@ card_stream:
   password: Y
   
 cyber_source:
-  login: X
-  password: Y
+  login: danhodos
+  password: "G3xFG5/5JkzolHFi2Dwb0GN8gYYg6wLWz+b0vRUIAp8m6LdHJUtkXCvp1oDPhYVCDp4g2bIBJmVPoInk5w32W2AZJT4mSQkhXV6L+2gENsLL8jYGCQ9lutmX5nhhGV6wT0jmjeq5nu9DClKDF5tSaaIInmaAOwHb675jskMGAApusf5r/4KEJfxwkBq1tCP4JH/AJ8n8WRbUsmRvqjKzzuo+33sn5QhdsfBmyilBN/40Navx2y0Bc36i2w3inElm5FJnfoxzAkEAw34nxuwogv9JMlDQB6yBFh03KdC2myOWECqOb2KTTYGrAMeEO93XJYgTILvHl8oJyg1Ihryexg=="
 
 data_cash:
   login: X
