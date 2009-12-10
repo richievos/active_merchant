@@ -67,7 +67,7 @@ class CyberSourceTest < Test::Unit::TestCase
     @gateway.stubs(:ssl_post).returns(successful_authorization_response)
     assert response = @gateway.authorize(@amount, @credit_card, @options)
     assert_equal Response, response.class
-    assert response.success?
+    assert_success response
     assert response.test?
   end
   
@@ -75,24 +75,24 @@ class CyberSourceTest < Test::Unit::TestCase
     @gateway.stubs(:ssl_post).returns(successful_tax_response)
     assert response = @gateway.calculate_tax(@credit_card, @options)
     assert_equal Response, response.class
-    assert response.success?
+    assert_success response
     assert response.test?
   end
 
   def test_successful_capture_request
     @gateway.stubs(:ssl_post).returns(successful_authorization_response, successful_capture_response)
     assert response = @gateway.authorize(@amount, @credit_card, @options)
-    assert response.success?
+    assert_success response
     assert response.test?
     assert response_capture = @gateway.capture(@amount, response.authorization)
-    assert response_capture.success?
+    assert_success response_capture
     assert response_capture.test?
   end
 
   def test_successful_purchase_request
     @gateway.stubs(:ssl_post).returns(successful_capture_response)
     assert response = @gateway.purchase(@amount, @credit_card, @options)
-    assert response.success?
+    assert_success response
     assert response.test?
   end
 
@@ -129,10 +129,10 @@ class CyberSourceTest < Test::Unit::TestCase
   def test_successful_credit_request
     @gateway.stubs(:ssl_post).returns(successful_capture_response, successful_credit_response)
     assert response = @gateway.purchase(@amount, @credit_card, @options)
-    assert response.success?
+    assert_success response
     assert response.test?
     assert response_capture = @gateway.credit(@amount, response.authorization)
-    assert response_capture.success?
+    assert_success response_capture
     assert response_capture.test?  
   end
   

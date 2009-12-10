@@ -50,7 +50,7 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert response = @gateway.authorize(@amount, @declined_card, @options)
     assert response.test?
     assert_equal 'Invalid account number', response.message
-    assert_equal false,  response.success?
+    assert_failure response
   end
 
   def test_successful_tax_calculation
