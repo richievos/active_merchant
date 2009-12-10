@@ -124,11 +124,12 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_failure capture
   end
 
-  def test_invalid_login
+  def test_invalid_login_should_raise_response_error
     gateway = CyberSourceGateway.new( :login => '', :password => '' )
-    assert response = gateway.purchase(@amount, @credit_card, @options)
-    assert_match /wsse:InvalidSecurity/, response.message
-    assert_failure response
+    exception = assert_raise(ActiveMerchant::ResponseError) do
+      gateway.purchase(@amount, @credit_card, @options)
+    end
+    assert_match /wsse:InvalidSecurity/, exception.response.body
   end
   
   def test_successful_credit
