@@ -135,8 +135,28 @@ class CyberSourceTest < Test::Unit::TestCase
     assert response_capture.success?
     assert response_capture.test?  
   end
+  
+  def test_request_should_not_include_a_business_rules_element_if_neither_ignore_avs_nor_ignore_cvv_are_set
+    assert_no_match(/businessRules/, auth_request)
+  end
 
-  private
+  def test_request_should_include_a_business_rules_element_if_ignore_avs_is_set
+    @gateway.instance_eval { @options.merge! :ignore_avs => true }
+    assert_match(/businessRules/, auth_request)
+    assert_match(/ignoreAVSResult/, auth_request)
+  end
+  
+  def test_request_should_include_a_business_rules_element_if_ignore_cvv_is_set
+    @gateway.instance_eval { @options.merge! :ignore_cvv => true }
+    assert_match(/businessRules/, auth_request)
+    assert_match(/ignoreCVResult/, auth_request)
+  end
+
+private
+
+  def auth_request
+    @auth_request ||= @gateway.send :build_auth_request, @amount, @credit_card, @options
+  end
   
   def successful_purchase_response
     <<-XML
