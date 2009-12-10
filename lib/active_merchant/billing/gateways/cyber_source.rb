@@ -233,6 +233,8 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_business_rules_data(xml)
+        return xml unless @options[:ignore_avs] || @options[:ignore_cvv]
+        
         xml.tag! 'businessRules' do
           xml.tag!('ignoreAVSResult', 'true') if @options[:ignore_avs]
           xml.tag!('ignoreCVResult', 'true') if @options[:ignore_cvv]
