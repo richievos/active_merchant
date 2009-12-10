@@ -31,7 +31,7 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
         }
       ],  
       :currency => 'USD',
-      :email => 'someguy1232@fakeemail.net',
+      :email => 'someguy1232@example.com',
       :ignore_avs => 'true',
       :ignore_cvv => 'true'
     }

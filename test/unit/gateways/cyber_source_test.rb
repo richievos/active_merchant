@@ -24,7 +24,7 @@ class CyberSourceTest < Test::Unit::TestCase
                   :phone => '(555)555-5555'
                },
 
-               :email => 'someguy1232@fakeemail.net',
+               :email => 'someguy1232@example.com',
                :order_id => '1000',
                :line_items => [
                    {
