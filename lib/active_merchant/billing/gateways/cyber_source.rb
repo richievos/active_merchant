@@ -1,5 +1,14 @@
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
+    # A class that wraps the normal ActiveMerchant Response. At the moment, all it allows for is
+    # accessing the returned subscriptionID from CyberSource using idiomatic Ruby naming conventions.
+    class CyberSourceResponse < Response
+      def subscription_id
+        params["subscriptionID"]
+      end
+      alias_method :token, :subscription_id
+    end
+    
     # See the remote and mocked unit test files for example usage.  Pay special attention to the contents of the options hash.
     #
     # Initial setup instructions can be found in http://cybersource.com/support_center/implementation/downloads/soap_api/SOAP_toolkits.pdf
@@ -16,6 +25,7 @@ module ActiveMerchant #:nodoc:
     # * All transactions use dollar values.
     # * In order to transact in multiple currencies, the desired currencies must be enabled on your CyberSource account. This can be accomplished by contacting CyberSource support (a link is available from the Business Center).
     class CyberSourceGateway < Gateway
+      
       TEST_URL = 'https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor'
       LIVE_URL = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
           
@@ -137,6 +147,19 @@ module ActiveMerchant #:nodoc:
         commit(build_credit_request(money, identification, options), options)
       end
       
+      # Allows for storing credit card information. In CyberSource, this is done behind the scenes by 
+      # creating a Profile.
+      #
+      # This call requires:
+      # - a valid credit card (storage of invalid cards is not allowed)
+      # - an address be specified in the options hash (as with authorize)
+      #
+      # This call allows:
+      # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD".
+      def store(creditcard, options = {})
+        setup_address_hash(options)
+        commit(build_store_request(creditcard, options), options)
+      end
 
       # CyberSource requires that you provide line item information for tax calculations
       # If you do not have prices for each item or want to simplify the situation then pass in one fake line item that costs the subtotal of the order
@@ -182,6 +205,15 @@ module ActiveMerchant #:nodoc:
         add_creditcard(xml, creditcard)
         add_auth_service(xml)
         add_business_rules_data(xml)
+        xml.target!
+      end
+      
+      def build_store_request(creditcard, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_address(xml, creditcard, options[:billing_address], options)
+        add_purchase_data(xml, 0, false)
+        add_creditcard(xml, creditcard)
+        add_profile_information(xml)
         xml.target!
       end
 
@@ -269,7 +301,7 @@ module ActiveMerchant #:nodoc:
       def add_purchase_data(xml, money = 0, include_grand_total = false, options={})
         xml.tag! 'purchaseTotals' do
           xml.tag! 'currency', options[:currency] || currency(money)
-          xml.tag!('grandTotalAmount', amount(money))  if include_grand_total 
+          xml.tag!('grandTotalAmount', amount(money))  if include_grand_total
         end
       end
 
@@ -306,6 +338,14 @@ module ActiveMerchant #:nodoc:
 
       def add_auth_service(xml)
         xml.tag! 'ccAuthService', {'run' => 'true'} 
+      end
+      
+      def add_profile_information(xml)
+        xml.tag! "recurringSubscriptionInfo" do
+          xml.tag! "amount", "0.00"
+          xml.tag! "frequency", "on-demand"
+        end
+        xml.tag! "paySubscriptionCreateService", { 'run' => 'true' }
       end
 
       def add_capture_service(xml, request_id, request_token)
@@ -365,8 +405,8 @@ module ActiveMerchant #:nodoc:
 	      success = response[:decision] == "ACCEPT"
 	      message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message] 
         authorization = success ? [ options[:order_id], response[:requestID], response[:requestToken] ].compact.join(";") : nil
-        
-        Response.new(success, message, response, 
+
+        CyberSourceResponse.new(success, message, response, 
           :test => test?, 
           :authorization => authorization,
           :avs_result => { :code => response[:avsCode] },
@@ -381,7 +421,7 @@ module ActiveMerchant #:nodoc:
         xml = REXML::Document.new(xml)
         if root = REXML::XPath.first(xml, "//c:replyMessage")
           root.elements.to_a.each do |node|
-            case node.name  
+            case node.name
             when 'c:reasonCode'
               reply[:message] = reply(node.text)
             else
