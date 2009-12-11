@@ -1,13 +1,11 @@
 require File.join(File.dirname(__FILE__), '../../test_helper')
+require 'ruby-debug'
 
 class CyberSourceTest < Test::Unit::TestCase
   def setup
     Base.gateway_mode = :test
 
-    @gateway = CyberSourceGateway.new(
-      :login => 'l',
-      :password => 'p'
-    )
+    @gateway = CyberSourceGateway.new(:login => 'l', :password => 'p')
 
     @amount = 100
     @credit_card = credit_card('4111111111111111', :type => 'visa')
@@ -104,6 +102,10 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_raise(ArgumentError){ @gateway.purchase(@amount, @credit_card, @options.delete_if{|key, val| key == :order_id}) }
   end
 
+  def test_requires_error_on_authorization_without_email
+    assert_raise(ArgumentError){ @gateway.purchase(@amount, @credit_card, @options.delete_if{|key, val| key == :email}) }
+  end
+
   def test_requires_error_on_tax_calculation_without_line_items
     assert_raise(ArgumentError){ @gateway.calculate_tax(@credit_card, @options.delete_if{|key, val| key == :line_items})}
   end
@@ -151,6 +153,29 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_match(/businessRules/, auth_request)
     assert_match(/ignoreCVResult/, auth_request)
   end
+  
+  def test_successful_store_request
+    @gateway.expects(:ssl_post).returns(successful_store_response)
+    response = @gateway.store(@credit_card, @options)
+
+    assert_success response
+    assert response.test?
+
+    assert_equal "2605496732830008402433", response.subscription_id
+    assert_equal response.subscription_id, response.token
+  end
+
+  def test_unsuccessful_store_request
+    @gateway.expects(:ssl_post).returns(unsuccessful_store_response)
+    response = @gateway.store(@declined_card, @options)
+
+    assert_failure response
+    assert response.test?
+
+    assert_nil response.subscription_id
+    assert_equal "Invalid account number", response.message
+  end
+
 
 private
 
@@ -202,6 +227,22 @@ private
 <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 <soap:Header>
 <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-5589339"><wsu:Created>2008-01-21T16:00:38.927Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.32"><c:merchantReferenceCode>TEST11111111111</c:merchantReferenceCode><c:requestID>2009312387810008401927</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Af/vj7OzPmut/eogHFCrBiwYsWTJy1r127CpCn0KdOgyTZnzKwVYCmzPmVgr9ID5H1WGTSTKuj0i30IE4+zsz2d/QNzwBwAACCPA</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccCreditReply><c:reasonCode>100</c:reasonCode><c:requestDateTime>2008-01-21T16:00:38Z</c:requestDateTime><c:amount>1.00</c:amount><c:reconciliationID>010112295WW70TBOPSSP2</c:reconciliationID></c:ccCreditReply></c:replyMessage></soap:Body></soap:Envelope>  
+    XML
+  end
+  
+  def successful_store_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-26088371"><wsu:Created>2009-12-11T16:41:13.825Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605496732830008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahj/7wSRGn0Pw/27AcQCIkGzlgzbs2TmsysR4zaZKTZJe5vuICmyS9zfcdIASQMMmkmVdHpKgmwJyI0+h+H+3YDiAQAA7SbN</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccAuthReply><c:reasonCode>100</c:reasonCode><c:amount>0.00</c:amount><c:authorizationCode>888888</c:authorizationCode><c:avsCode>X</c:avsCode><c:avsCodeRaw>I1</c:avsCodeRaw><c:authorizedDateTime>2009-12-11T16:41:13Z</c:authorizedDateTime><c:processorResponse>100</c:processorResponse><c:reconciliationID>69037329V2XGF6LJ</c:reconciliationID></c:ccAuthReply><c:paySubscriptionCreateReply><c:reasonCode>100</c:reasonCode><c:subscriptionID>2605496732830008402433</c:subscriptionID></c:paySubscriptionCreateReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+
+  def unsuccessful_store_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-3113717"><wsu:Created>2009-12-11T17:13:26.296Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605516062390008430595</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>231</c:reasonCode><c:requestToken>Ahj77wSRGn2ZHEGF8IAGIpu5p2fa8BTdzTs+1+kAJIFOfSTKuj0lQTQFZEafZkcQYXwgAYAAtiU2</c:requestToken><c:ccAuthReply><c:reasonCode>231</c:reasonCode></c:ccAuthReply></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
 
