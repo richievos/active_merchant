@@ -57,14 +57,14 @@ class CyberSourceTest < Test::Unit::TestCase
     @gateway.expects(:ssl_post).returns(unsuccessful_authorization_response)
 
     assert response = @gateway.purchase(@amount, @credit_card, @options)
-    assert_instance_of Response, response
+    assert_kind_of Response, response
     assert_failure response
   end
   
   def test_successful_auth_request
     @gateway.stubs(:ssl_post).returns(successful_authorization_response)
     assert response = @gateway.authorize(@amount, @credit_card, @options)
-    assert_equal Response, response.class
+    assert_kind_of Response, response
     assert_success response
     assert response.test?
   end
@@ -72,7 +72,7 @@ class CyberSourceTest < Test::Unit::TestCase
   def test_successful_tax_request
     @gateway.stubs(:ssl_post).returns(successful_tax_response)
     assert response = @gateway.calculate_tax(@credit_card, @options)
-    assert_equal Response, response.class
+    assert_kind_of Response, response
     assert_success response
     assert response.test?
   end
@@ -161,8 +161,7 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_success response
     assert response.test?
 
-    assert_equal "2605496732830008402433", response.subscription_id
-    assert_equal response.subscription_id, response.token
+    assert_equal "2605496732830008402433", response.params["subscriptionID"]
   end
 
   def test_unsuccessful_store_request
@@ -172,10 +171,30 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_failure response
     assert response.test?
 
-    assert_nil response.subscription_id
+    assert_nil response.params["subscriptionID"]
     assert_equal "Invalid account number", response.message
   end
+  
+  def test_successful_retrieve_request
+    @gateway.expects(:ssl_post).returns(successful_retrieve_response)
+    response = @gateway.retrieve("2605522582930008402433")
+    
+    assert_success response
+    assert response.test?
 
+    assert !response.params["email"].blank?
+  end
+
+  def test_unsuccessful_retrieve_request
+    @gateway.expects(:ssl_post).returns(unsuccessful_retrieve_response)
+    response = @gateway.retrieve("fake-subscription-id-here")
+    
+    assert_failure response
+    assert response.test?
+
+    assert_equal "One or more fields contains invalid data", response.message
+    assert response.params["email"].blank?
+  end
 
 private
 
@@ -245,5 +264,20 @@ private
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-3113717"><wsu:Created>2009-12-11T17:13:26.296Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605516062390008430595</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>231</c:reasonCode><c:requestToken>Ahj77wSRGn2ZHEGF8IAGIpu5p2fa8BTdzTs+1+kAJIFOfSTKuj0lQTQFZEafZkcQYXwgAYAAtiU2</c:requestToken><c:ccAuthReply><c:reasonCode>231</c:reasonCode></c:ccAuthReply></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
-
+  
+  def successful_retrieve_response
+    <<-XML
+      <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+      <soap:Header>
+      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-19066339"><wsu:Created>2009-12-11T17:51:54.978Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605539149490008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>AhjzbwSRGn49J3I6uVQCIgKbJL3PYO0gBJAwyaSZV0ekqCaAaAAA8AMX</c:requestToken><c:paySubscriptionRetrieveReply><c:reasonCode>100</c:reasonCode><c:approvalRequired>false</c:approvalRequired><c:automaticRenew>true</c:automaticRenew><c:cardAccountNumber>411111XXXXXX1111</c:cardAccountNumber><c:cardExpirationMonth>12</c:cardExpirationMonth><c:cardExpirationYear>2020</c:cardExpirationYear><c:cardType>001</c:cardType><c:city>Mountain View</c:city><c:country>US</c:country><c:currency>USD</c:currency><c:email>null@cybersource.com</c:email><c:endDate>99991231</c:endDate><c:firstName>JOHNNY</c:firstName><c:frequency>on-demand</c:frequency><c:lastName>DOE</c:lastName><c:paymentMethod>credit card</c:paymentMethod><c:paymentsRemaining>0</c:paymentsRemaining><c:postalCode>94043</c:postalCode><c:startDate>20091212</c:startDate><c:state>CA</c:state><c:status>CANCELED</c:status><c:street1>1295 Charleston Road</c:street1><c:subscriptionID>2605522582930008402433</c:subscriptionID><c:totalPayments>0</c:totalPayments><c:merchantDefinedDataField1>?</c:merchantDefinedDataField1><c:merchantDefinedDataField2>?</c:merchantDefinedDataField2><c:merchantDefinedDataField3>?</c:merchantDefinedDataField3><c:merchantDefinedDataField4>?</c:merchantDefinedDataField4></c:paySubscriptionRetrieveReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def unsuccessful_retrieve_response
+    <<-XML
+      <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+      <soap:Header>
+      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-26828169"><wsu:Created>2009-12-11T21:04:00.367Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605654403410008299530</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhijLwSRGoFwFRr72rAUIpve8BjDsBJAozaSZV0ekqCaAAAAYgJy</c:requestToken><c:paySubscriptionRetrieveReply><c:reasonCode>102</c:reasonCode></c:paySubscriptionRetrieveReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
 end

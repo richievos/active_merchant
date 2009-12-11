@@ -1,14 +1,5 @@
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
-    # A class that wraps the normal ActiveMerchant Response. At the moment, all it allows for is
-    # accessing the returned subscriptionID from CyberSource using idiomatic Ruby naming conventions.
-    class CyberSourceResponse < Response
-      def subscription_id
-        params["subscriptionID"]
-      end
-      alias_method :token, :subscription_id
-    end
-    
     # See the remote and mocked unit test files for example usage.  Pay special attention to the contents of the options hash.
     #
     # Initial setup instructions can be found in http://cybersource.com/support_center/implementation/downloads/soap_api/SOAP_toolkits.pdf
@@ -160,6 +151,14 @@ module ActiveMerchant #:nodoc:
         setup_address_hash(options)
         commit(build_store_request(creditcard, options), options)
       end
+      
+      # Allows for retrieving stored Profile information.
+      #
+      # This call requires:
+      # - a subscription_id from CyberSource (retrieved when using store to create a Profile).
+      def retrieve(identification, options={})
+        commit(build_retrieve_request(identification, options), options)
+      end
 
       # CyberSource requires that you provide line item information for tax calculations
       # If you do not have prices for each item or want to simplify the situation then pass in one fake line item that costs the subtotal of the order
@@ -188,7 +187,7 @@ module ActiveMerchant #:nodoc:
       def calculate_tax(creditcard, options)
         requires!(options,  :line_items)
         setup_address_hash(options)
-        commit(build_tax_calculation_request(creditcard, options), options)	  
+        commit(build_tax_calculation_request(creditcard, options), options)
       end
       
       private                       
@@ -214,6 +213,20 @@ module ActiveMerchant #:nodoc:
         add_purchase_data(xml, 0, false)
         add_creditcard(xml, creditcard)
         add_profile_information(xml)
+        xml.target!
+      end
+      
+      def build_retrieve_request(identification, options)
+        # CyberSource requires this (put into the XML as merchantReferenceCode) to be set to *something*, 
+        # although it doesn't care about its contents otherwise.
+        options[:order_id] = Time.now.to_i.to_s
+        
+        xml = Builder::XmlMarkup.new :indent => 2
+        xml.tag! "recurringSubscriptionInfo" do
+          xml.tag! "subscriptionID", identification
+        end
+        xml.tag! "paySubscriptionRetrieveService", { 'run' => 'true' }
+        
         xml.target!
       end
 
@@ -400,13 +413,13 @@ module ActiveMerchant #:nodoc:
       
       # Contact CyberSource, make the SOAP request, and parse the reply into a Response object
       def commit(request, options)
-	      response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, build_request(request, options)))
+        response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, build_request(request, options)))
         
-	      success = response[:decision] == "ACCEPT"
-	      message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message] 
+        success = response[:decision] == "ACCEPT"
+        message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message] 
         authorization = success ? [ options[:order_id], response[:requestID], response[:requestToken] ].compact.join(";") : nil
 
-        CyberSourceResponse.new(success, message, response, 
+        Response.new(success, message, response, 
           :test => test?, 
           :authorization => authorization,
           :avs_result => { :code => response[:avsCode] },

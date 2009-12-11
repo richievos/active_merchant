@@ -156,7 +156,7 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_success response
     assert_equal 'Successful transaction', response.message
 
-    assert !response.subscription_id.blank?
+    assert !response.params["subscriptionID"].blank?
   end
 
   def test_unsuccessful_store
@@ -166,7 +166,26 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_failure response
     assert_equal 'Invalid account number', response.message
 
-    assert response.subscription_id.blank?
+    assert response.params["subscriptionID"].blank?
+  end
+  
+  def test_successful_retrieve
+    response = @gateway.retrieve("2605661798730008402433")
+    
+    assert response.test?
+    assert_success response
+
+    assert !response.params["email"].blank?
+  end
+
+  def test_unsuccessful_retrieve
+    response = @gateway.retrieve("fake-subscription-id-here")
+    
+    assert_failure response
+    assert response.test?
+
+    assert_equal "One or more fields contains invalid data", response.message
+    assert response.params["email"].blank?
   end
 
 end
