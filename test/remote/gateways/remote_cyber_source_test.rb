@@ -170,12 +170,13 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
   end
   
   def test_successful_retrieve
-    response = @gateway.retrieve("2605661798730008402433")
+    store_response = @gateway.store(@credit_card, @options.merge(:email => "123fake@example.com"))
+    response = @gateway.retrieve(store_response.params["subscriptionID"])
     
     assert response.test?
     assert_success response
 
-    assert !response.params["email"].blank?
+    assert_equal "123fake@example.com", response.params["email"]
   end
 
   def test_unsuccessful_retrieve
