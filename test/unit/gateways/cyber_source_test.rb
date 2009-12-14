@@ -195,6 +195,24 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_equal "One or more fields contains invalid data", response.message
     assert response.params["email"].blank?
   end
+  
+  def test_successful_update_request
+    @gateway.expects(:ssl_post).returns(successful_update_response)
+    response = @gateway.update("2605522582930008402433", @options.merge(:credit_card => @credit_card))
+
+    assert_success response
+    assert response.test?
+  end
+
+  def test_unsuccessful_update_request
+    @gateway.expects(:ssl_post).returns(unsuccessful_update_response)
+    response = @gateway.update("2605522582930008402433", @options.merge(:credit_card => @declined_card))
+
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "Invalid account number", response.message
+  end
 
 private
 
@@ -278,6 +296,22 @@ private
       <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
       <soap:Header>
       <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-26828169"><wsu:Created>2009-12-11T21:04:00.367Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605654403410008299530</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhijLwSRGoFwFRr72rAUIpve8BjDsBJAozaSZV0ekqCaAAAAYgJy</c:requestToken><c:paySubscriptionRetrieveReply><c:reasonCode>102</c:reasonCode></c:paySubscriptionRetrieveReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def successful_update_response
+    <<-XML
+      <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+      <soap:Header>
+      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-14541536"><wsu:Created>2009-12-14T17:46:31.838Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2608127916010008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>AhjzbwSRGsYXclB4xbQCIgKbJL4YVP0gBJCQyaSZV0ekqCaAmAAA7AFT</c:requestToken><c:paySubscriptionUpdateReply><c:reasonCode>100</c:reasonCode><c:subscriptionID>2605522582930008402433</c:subscriptionID></c:paySubscriptionUpdateReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def unsuccessful_update_response
+    <<-XML
+      <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+      <soap:Header>
+      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-1477803"><wsu:Created>2009-12-14T17:47:36.047Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2608128559980008402433</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>231</c:reasonCode><c:requestToken>AhjzbwSRGsYcBbBe9twCIgKbJL4YWM0gBJCJz6SZV0ekqCaAqAAASwIo</c:requestToken><c:paySubscriptionUpdateReply><c:reasonCode>231</c:reasonCode></c:paySubscriptionUpdateReply></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
 end
