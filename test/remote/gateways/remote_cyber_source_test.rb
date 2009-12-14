@@ -188,5 +188,45 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_equal "One or more fields contains invalid data", response.message
     assert response.params["email"].blank?
   end
+  
+  def test_successful_update_request
+    new_credit_card = credit_card("5555 5555 5555 4444", :type => :master)
+    new_options = { :credit_card => new_credit_card, :email => "321contact@example.com" }
+
+    store_response = @gateway.store(@credit_card, @options)
+    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    assert retrieve_response.params["cardAccountNumber"].starts_with?("4111")
+    assert_not_equal "321contact@example.com", retrieve_response.params["email"]
+    
+    response = @gateway.update(store_response.params["subscriptionID"], @options.merge(new_options))
+    assert_success response
+    assert response.test?
+
+    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    assert retrieve_response.params["cardAccountNumber"].starts_with?("5555")
+    assert_equal "321contact@example.com", retrieve_response.params["email"]
+  end
+  
+  def test_just_updating_address_should_be_successful
+    new_options = { :billing_address => address(:address1 => "123 Fake St.") }
+    
+    store_response = @gateway.store(@credit_card, @options)
+    response = @gateway.update(store_response.params["subscriptionID"], @options.merge(new_options))
+    assert_success response
+    assert response.test?
+    
+    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    assert_equal "123 Fake St.", retrieve_response.params["street1"]
+  end
+
+  def test_unsuccessful_update_request
+    store_response = @gateway.store(@credit_card, @options)
+    response = @gateway.update(store_response.params["subscriptionID"], @options.merge(:credit_card => @declined_card))
+  
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "Invalid account number", response.message
+  end
 
 end

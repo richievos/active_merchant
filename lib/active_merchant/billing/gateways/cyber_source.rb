@@ -159,6 +159,19 @@ module ActiveMerchant #:nodoc:
       def retrieve(identification, options={})
         commit(build_retrieve_request(identification, options), options)
       end
+      
+      # Allows for updating stored Profile information.
+      #
+      # This call requires:
+      # - a subscription_id from CyberSource (retrieved when using store to create a Profile).
+      #
+      # This call allows:
+      # - a valid credit card object be specified in the options hash (as with the first 
+      # parameter to store) as :credit_card
+      # - an address be specified in the options hash (as with authorize)
+      def update(identification, options={})
+        commit(build_update_request(identification, options), options)
+      end
 
       # CyberSource requires that you provide line item information for tax calculations
       # If you do not have prices for each item or want to simplify the situation then pass in one fake line item that costs the subtotal of the order
@@ -212,7 +225,15 @@ module ActiveMerchant #:nodoc:
         add_address(xml, creditcard, options[:billing_address], options)
         add_purchase_data(xml, 0, false)
         add_creditcard(xml, creditcard)
-        add_profile_information(xml)
+        add_store_information(xml)
+        xml.target!
+      end
+      
+      def build_update_request(identification, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_address(xml, options[:credit_card], options[:billing_address], options) if options[:billing_address]
+        add_creditcard(xml, options[:credit_card]) if options[:credit_card]
+        add_update_information(xml, identification)
         xml.target!
       end
       
@@ -320,8 +341,8 @@ module ActiveMerchant #:nodoc:
 
       def add_address(xml, creditcard, address, options, shipTo = false)      
         xml.tag! shipTo ? 'shipTo' : 'billTo' do
-          xml.tag! 'firstName', creditcard.first_name
-          xml.tag! 'lastName', creditcard.last_name 
+          xml.tag! 'firstName', creditcard.first_name if creditcard
+          xml.tag! 'lastName', creditcard.last_name if creditcard
           xml.tag! 'street1', address[:address1]
           xml.tag! 'street2', address[:address2]
           xml.tag! 'city', address[:city]
@@ -353,12 +374,20 @@ module ActiveMerchant #:nodoc:
         xml.tag! 'ccAuthService', {'run' => 'true'} 
       end
       
-      def add_profile_information(xml)
+      def add_store_information(xml)
         xml.tag! "recurringSubscriptionInfo" do
           xml.tag! "amount", "0.00"
           xml.tag! "frequency", "on-demand"
         end
         xml.tag! "paySubscriptionCreateService", { 'run' => 'true' }
+      end
+      
+      def add_update_information(xml, identification)
+        xml.tag! "recurringSubscriptionInfo" do
+          xml.tag! "subscriptionID", identification
+          xml.tag! "amount", "0.00"
+        end
+        xml.tag! "paySubscriptionUpdateService", { 'run' => 'true' }
       end
 
       def add_capture_service(xml, request_id, request_token)
