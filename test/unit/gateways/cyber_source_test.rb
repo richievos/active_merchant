@@ -214,6 +214,25 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_equal "Invalid account number", response.message
   end
 
+  def test_successful_remove_request
+    @gateway.expects(:ssl_post).returns(successful_remove_response)
+    response = @gateway.remove("2605522582930008402433")
+
+    assert_success response
+    assert response.test?
+  end
+
+  def test_unsuccessful_remove_request
+    @gateway.expects(:ssl_post).returns(unsuccessful_remove_response)
+    response = @gateway.remove("fake-identification-here")
+
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
+  end
+
+
 private
 
   def auth_request
@@ -312,6 +331,22 @@ private
       <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
       <soap:Header>
       <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-1477803"><wsu:Created>2009-12-14T17:47:36.047Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2608128559980008402433</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>231</c:reasonCode><c:requestToken>AhjzbwSRGsYcBbBe9twCIgKbJL4YWM0gBJCJz6SZV0ekqCaAqAAASwIo</c:requestToken><c:paySubscriptionUpdateReply><c:reasonCode>231</c:reasonCode></c:paySubscriptionUpdateReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def successful_remove_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-20639837"><wsu:Created>2009-12-15T00:42:50.901Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>CANCELLED</c:merchantReferenceCode><c:requestID>2608377708580008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>AhijLwSRGs0GVFotiTwCIpskvigfoBJCQyaSZV0ekqCaAAAA4gDN</c:requestToken><c:paySubscriptionUpdateReply><c:reasonCode>100</c:reasonCode><c:subscriptionID>2608325603560008299530</c:subscriptionID></c:paySubscriptionUpdateReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def unsuccessful_remove_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-11837645"><wsu:Created>2009-12-15T00:43:17.804Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>CANCELLED</c:merchantReferenceCode><c:requestID>2608377977790008299530</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhijLwSRGs0IPgraXSAUIpve8Dq1wBJCIzaSZV0ekqCaAAAA8AEd</c:requestToken><c:paySubscriptionUpdateReply><c:reasonCode>102</c:reasonCode></c:paySubscriptionUpdateReply></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
 end

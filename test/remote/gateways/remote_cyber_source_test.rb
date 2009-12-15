@@ -228,5 +228,24 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     
     assert_equal "Invalid account number", response.message
   end
+  
+  def test_successful_remove_request
+    store_response = @gateway.store(@credit_card, @options)
+    response = @gateway.remove(store_response.params["subscriptionID"])
 
+    assert_success response
+    assert response.test?
+    
+    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    assert_equal "CANCELED", retrieve_response.params["status"]
+  end
+
+  def test_unsuccessful_remove_request
+    response = @gateway.remove("fake-identification-here")
+
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
+  end
 end

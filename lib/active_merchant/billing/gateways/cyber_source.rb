@@ -172,6 +172,18 @@ module ActiveMerchant #:nodoc:
       def update(identification, options={})
         commit(build_update_request(identification, options), options)
       end
+      
+      # Allows for removing stored Profile information. In CyberSource, there's no *real* way 
+      # to remove Profile information. Instead, we actually just cancel the Profile, which
+      # means we are no longer able to authorize against it. Since Profiles are PCI compliant, 
+      # the only information about customers that will still be readily available are name and
+      # address (credit card numbers are masked).
+      #
+      # This call requires:
+      # - a subscription_id from CyberSource (retrieved when using store to create a Profile).
+      def remove(identification, options={})
+        commit(build_remove_request(identification, options), options)
+      end
 
       # CyberSource requires that you provide line item information for tax calculations
       # If you do not have prices for each item or want to simplify the situation then pass in one fake line item that costs the subtotal of the order
@@ -248,6 +260,14 @@ module ActiveMerchant #:nodoc:
         end
         xml.tag! "paySubscriptionRetrieveService", { 'run' => 'true' }
         
+        xml.target!
+      end
+      
+      def build_remove_request(identification, options)
+        options[:order_id] = Time.now.to_i.to_s
+        
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_update_information(xml, identification, true)
         xml.target!
       end
 
@@ -382,9 +402,10 @@ module ActiveMerchant #:nodoc:
         xml.tag! "paySubscriptionCreateService", { 'run' => 'true' }
       end
       
-      def add_update_information(xml, identification)
+      def add_update_information(xml, identification, should_cancel=false)
         xml.tag! "recurringSubscriptionInfo" do
           xml.tag! "subscriptionID", identification
+          xml.tag! "status", "cancel" if should_cancel
           xml.tag! "amount", "0.00"
         end
         xml.tag! "paySubscriptionUpdateService", { 'run' => 'true' }
@@ -415,7 +436,6 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'captureRequestToken', request_token
         end
       end
-
       
       # Where we actually build the full SOAP request using builder
       def build_request(body, options)
