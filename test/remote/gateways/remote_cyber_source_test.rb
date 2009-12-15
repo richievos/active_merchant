@@ -229,9 +229,9 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_equal "Invalid account number", response.message
   end
   
-  def test_successful_remove_request
+  def test_successful_unstore_request
     store_response = @gateway.store(@credit_card, @options)
-    response = @gateway.remove(store_response.token)
+    response = @gateway.unstore(store_response.token)
 
     assert_success response
     assert response.test?
@@ -240,8 +240,8 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_equal "CANCELED", retrieve_response.params["status"]
   end
 
-  def test_unsuccessful_remove_request
-    response = @gateway.remove("fake-identification-here")
+  def test_unsuccessful_unstore_request
+    response = @gateway.unstore("fake-identification-here")
 
     assert_failure response
     assert response.test?
