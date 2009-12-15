@@ -231,8 +231,14 @@ class CyberSourceTest < Test::Unit::TestCase
     
     assert_equal "One or more fields contains invalid data", response.message
   end
-
-
+  
+  def test_custom_values_should_be_returned_to_retrieve_as_an_array
+    @gateway.expects(:ssl_post).returns(successful_retrieve_response)
+    response = @gateway.retrieve("2605522582930008402433")
+    
+    assert_equal ["boo", "cry"], response.custom_values
+  end
+  
 private
 
   def auth_request
@@ -306,7 +312,7 @@ private
     <<-XML
       <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
       <soap:Header>
-      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-19066339"><wsu:Created>2009-12-11T17:51:54.978Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605539149490008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>AhjzbwSRGn49J3I6uVQCIgKbJL3PYO0gBJAwyaSZV0ekqCaAaAAA8AMX</c:requestToken><c:paySubscriptionRetrieveReply><c:reasonCode>100</c:reasonCode><c:approvalRequired>false</c:approvalRequired><c:automaticRenew>true</c:automaticRenew><c:cardAccountNumber>411111XXXXXX1111</c:cardAccountNumber><c:cardExpirationMonth>12</c:cardExpirationMonth><c:cardExpirationYear>2020</c:cardExpirationYear><c:cardType>001</c:cardType><c:city>Mountain View</c:city><c:country>US</c:country><c:currency>USD</c:currency><c:email>null@cybersource.com</c:email><c:endDate>99991231</c:endDate><c:firstName>JOHNNY</c:firstName><c:frequency>on-demand</c:frequency><c:lastName>DOE</c:lastName><c:paymentMethod>credit card</c:paymentMethod><c:paymentsRemaining>0</c:paymentsRemaining><c:postalCode>94043</c:postalCode><c:startDate>20091212</c:startDate><c:state>CA</c:state><c:status>CANCELED</c:status><c:street1>1295 Charleston Road</c:street1><c:subscriptionID>2605522582930008402433</c:subscriptionID><c:totalPayments>0</c:totalPayments><c:merchantDefinedDataField1>?</c:merchantDefinedDataField1><c:merchantDefinedDataField2>?</c:merchantDefinedDataField2><c:merchantDefinedDataField3>?</c:merchantDefinedDataField3><c:merchantDefinedDataField4>?</c:merchantDefinedDataField4></c:paySubscriptionRetrieveReply></c:replyMessage></soap:Body></soap:Envelope>
+      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-19066339"><wsu:Created>2009-12-11T17:51:54.978Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2605539149490008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>AhjzbwSRGn49J3I6uVQCIgKbJL3PYO0gBJAwyaSZV0ekqCaAaAAA8AMX</c:requestToken><c:paySubscriptionRetrieveReply><c:reasonCode>100</c:reasonCode><c:approvalRequired>false</c:approvalRequired><c:automaticRenew>true</c:automaticRenew><c:cardAccountNumber>411111XXXXXX1111</c:cardAccountNumber><c:cardExpirationMonth>12</c:cardExpirationMonth><c:cardExpirationYear>2020</c:cardExpirationYear><c:cardType>001</c:cardType><c:city>Mountain View</c:city><c:country>US</c:country><c:currency>USD</c:currency><c:email>null@cybersource.com</c:email><c:endDate>99991231</c:endDate><c:firstName>JOHNNY</c:firstName><c:frequency>on-demand</c:frequency><c:lastName>DOE</c:lastName><c:paymentMethod>credit card</c:paymentMethod><c:paymentsRemaining>0</c:paymentsRemaining><c:postalCode>94043</c:postalCode><c:startDate>20091212</c:startDate><c:state>CA</c:state><c:status>CANCELED</c:status><c:street1>1295 Charleston Road</c:street1><c:subscriptionID>2605522582930008402433</c:subscriptionID><c:totalPayments>0</c:totalPayments><c:merchantDefinedDataField1>boo</c:merchantDefinedDataField1><c:merchantDefinedDataField2>cry</c:merchantDefinedDataField2></c:paySubscriptionRetrieveReply></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
   
