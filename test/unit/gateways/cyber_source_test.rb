@@ -214,17 +214,17 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_equal "Invalid account number", response.message
   end
 
-  def test_successful_remove_request
-    @gateway.expects(:ssl_post).returns(successful_remove_response)
-    response = @gateway.remove("2605522582930008402433")
+  def test_successful_unstore_request
+    @gateway.expects(:ssl_post).returns(successful_unstore_response)
+    response = @gateway.unstore("2605522582930008402433")
 
     assert_success response
     assert response.test?
   end
 
-  def test_unsuccessful_remove_request
-    @gateway.expects(:ssl_post).returns(unsuccessful_remove_response)
-    response = @gateway.remove("fake-identification-here")
+  def test_unsuccessful_unstore_request
+    @gateway.expects(:ssl_post).returns(unsuccessful_unstore_response)
+    response = @gateway.unstore("fake-identification-here")
 
     assert_failure response
     assert response.test?
@@ -340,7 +340,7 @@ private
     XML
   end
   
-  def successful_remove_response
+  def successful_unstore_response
     <<-XML
     <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Header>
@@ -348,7 +348,7 @@ private
     XML
   end
   
-  def unsuccessful_remove_response
+  def unsuccessful_unstore_response
     <<-XML
     <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Header>

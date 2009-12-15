@@ -201,8 +201,8 @@ module ActiveMerchant #:nodoc:
       #
       # This call requires:
       # - a subscription_id from CyberSource (retrieved when using store to create a Profile).
-      def remove(identification, options={})
-        commit(build_remove_request(identification, options), options)
+      def unstore(identification, options={})
+        commit(build_unstore_request(identification, options), options)
       end
 
       # CyberSource requires that you provide line item information for tax calculations
@@ -287,7 +287,7 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
       
-      def build_remove_request(identification, options)
+      def build_unstore_request(identification, options)
         options[:order_id] = Time.now.to_i.to_s
         
         xml = Builder::XmlMarkup.new :indent => 2
