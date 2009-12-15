@@ -161,7 +161,7 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_success response
     assert response.test?
 
-    assert_equal "2605496732830008402433", response.params["subscriptionID"]
+    assert_equal "2605496732830008402433", response.token
   end
 
   def test_unsuccessful_store_request
@@ -171,7 +171,7 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_failure response
     assert response.test?
 
-    assert_nil response.params["subscriptionID"]
+    assert_nil response.token
     assert_equal "Invalid account number", response.message
   end
   

@@ -156,7 +156,7 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_success response
     assert_equal 'Successful transaction', response.message
 
-    assert !response.params["subscriptionID"].blank?
+    assert !response.token.blank?
   end
 
   def test_unsuccessful_store
@@ -166,12 +166,12 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_failure response
     assert_equal 'Invalid account number', response.message
 
-    assert response.params["subscriptionID"].blank?
+    assert response.token.blank?
   end
   
   def test_successful_retrieve
     store_response = @gateway.store(@credit_card, @options.merge(:email => "123fake@example.com"))
-    response = @gateway.retrieve(store_response.params["subscriptionID"])
+    response = @gateway.retrieve(store_response.token)
     
     assert response.test?
     assert_success response
@@ -194,15 +194,15 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     new_options = { :credit_card => new_credit_card, :email => "321contact@example.com" }
 
     store_response = @gateway.store(@credit_card, @options)
-    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    retrieve_response = @gateway.retrieve(store_response.token)
     assert retrieve_response.params["cardAccountNumber"].starts_with?("4111")
     assert_not_equal "321contact@example.com", retrieve_response.params["email"]
     
-    response = @gateway.update(store_response.params["subscriptionID"], @options.merge(new_options))
+    response = @gateway.update(store_response.token, @options.merge(new_options))
     assert_success response
     assert response.test?
 
-    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    retrieve_response = @gateway.retrieve(store_response.token)
     assert retrieve_response.params["cardAccountNumber"].starts_with?("5555")
     assert_equal "321contact@example.com", retrieve_response.params["email"]
   end
@@ -211,17 +211,17 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     new_options = { :billing_address => address(:address1 => "123 Fake St.") }
     
     store_response = @gateway.store(@credit_card, @options)
-    response = @gateway.update(store_response.params["subscriptionID"], @options.merge(new_options))
+    response = @gateway.update(store_response.token, @options.merge(new_options))
     assert_success response
     assert response.test?
     
-    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    retrieve_response = @gateway.retrieve(store_response.token)
     assert_equal "123 Fake St.", retrieve_response.params["street1"]
   end
 
   def test_unsuccessful_update_request
     store_response = @gateway.store(@credit_card, @options)
-    response = @gateway.update(store_response.params["subscriptionID"], @options.merge(:credit_card => @declined_card))
+    response = @gateway.update(store_response.token, @options.merge(:credit_card => @declined_card))
   
     assert_failure response
     assert response.test?
@@ -231,12 +231,12 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
   
   def test_successful_remove_request
     store_response = @gateway.store(@credit_card, @options)
-    response = @gateway.remove(store_response.params["subscriptionID"])
+    response = @gateway.remove(store_response.token)
 
     assert_success response
     assert response.test?
     
-    retrieve_response = @gateway.retrieve(store_response.params["subscriptionID"])
+    retrieve_response = @gateway.retrieve(store_response.token)
     assert_equal "CANCELED", retrieve_response.params["status"]
   end
 
@@ -251,7 +251,7 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
   
   def test_should_be_able_to_store_custom_fields
     store_response = @gateway.store(@credit_card, @options.merge({ :custom => ['001', '555', '642', 'snap-crackle-pop', 'not stored'] }))
-    response = @gateway.retrieve(store_response.params["subscriptionID"])
+    response = @gateway.retrieve(store_response.token)
 
     assert_success response
     assert response.test?
@@ -261,9 +261,9 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
   
   def test_should_be_able_update_custom_fields
     store_response = @gateway.store(@credit_card, @options.merge({ :custom => ['001', '555', '642', 'snap-crackle-pop', 'not stored'] }))
-    update_respone = @gateway.update(store_response.params["subscriptionID"], @options.merge({ :custom => ['changed!'] }))
+    update_respone = @gateway.update(store_response.token, @options.merge({ :custom => ['changed!'] }))
 
-    response = @gateway.retrieve(store_response.params["subscriptionID"])
+    response = @gateway.retrieve(store_response.token)
     assert_success response
     assert response.test?
 
