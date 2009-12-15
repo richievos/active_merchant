@@ -248,4 +248,25 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     
     assert_equal "One or more fields contains invalid data", response.message
   end
+  
+  def test_should_be_able_to_store_custom_fields
+    store_response = @gateway.store(@credit_card, @options.merge({ :custom => ['001', '555', '642', 'snap-crackle-pop', 'not stored'] }))
+    response = @gateway.retrieve(store_response.params["subscriptionID"])
+
+    assert_success response
+    assert response.test?
+
+    assert_equal ["001", "555", "642", "snap-crackle-pop"], response.custom_values
+  end
+  
+  def test_should_be_able_update_custom_fields
+    store_response = @gateway.store(@credit_card, @options.merge({ :custom => ['001', '555', '642', 'snap-crackle-pop', 'not stored'] }))
+    update_respone = @gateway.update(store_response.params["subscriptionID"], @options.merge({ :custom => ['changed!'] }))
+
+    response = @gateway.retrieve(store_response.params["subscriptionID"])
+    assert_success response
+    assert response.test?
+
+    assert_equal ["changed!", "555", "642", "snap-crackle-pop"], response.custom_values
+  end
 end

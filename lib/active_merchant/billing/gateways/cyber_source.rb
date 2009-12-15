@@ -1,5 +1,13 @@
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
+    # A convenience class that wraps Response and provides some readers for accessing
+    # returned data from CyberSource in a more idiomatic manner.
+    class CyberSourceResponse < Response
+      def custom_values
+        params.values_at('merchantDefinedDataField1', 'merchantDefinedDataField2', 'merchantDefinedDataField3', 'merchantDefinedDataField4').compact
+      end
+    end
+    
     # See the remote and mocked unit test files for example usage.  Pay special attention to the contents of the options hash.
     #
     # Initial setup instructions can be found in http://cybersource.com/support_center/implementation/downloads/soap_api/SOAP_toolkits.pdf
@@ -147,6 +155,10 @@ module ActiveMerchant #:nodoc:
       #
       # This call allows:
       # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD".
+      # - a :custom option in the options hash. This can be an Array of up to four items that will
+      # be sent to CyberSource for storage along with the rest of the customer Profile information.
+      # Note that each item in the Array will have to_s called on it, so plan for your own
+      # mapping/serialization carefully.
       def store(creditcard, options = {})
         setup_address_hash(options)
         commit(build_store_request(creditcard, options), options)
@@ -238,6 +250,8 @@ module ActiveMerchant #:nodoc:
         add_purchase_data(xml, 0, false)
         add_creditcard(xml, creditcard)
         add_store_information(xml)
+        add_custom_information(xml, options[:custom]) unless options[:custom].blank?
+        add_create_service(xml)
         xml.target!
       end
       
@@ -246,6 +260,8 @@ module ActiveMerchant #:nodoc:
         add_address(xml, options[:credit_card], options[:billing_address], options) if options[:billing_address]
         add_creditcard(xml, options[:credit_card]) if options[:credit_card]
         add_update_information(xml, identification)
+        add_custom_information(xml, options[:custom]) unless options[:custom].blank?
+        add_update_service(xml)
         xml.target!
       end
       
@@ -268,6 +284,7 @@ module ActiveMerchant #:nodoc:
         
         xml = Builder::XmlMarkup.new :indent => 2
         add_update_information(xml, identification, true)
+        add_update_service(xml)
         xml.target!
       end
 
@@ -399,7 +416,6 @@ module ActiveMerchant #:nodoc:
           xml.tag! "amount", "0.00"
           xml.tag! "frequency", "on-demand"
         end
-        xml.tag! "paySubscriptionCreateService", { 'run' => 'true' }
       end
       
       def add_update_information(xml, identification, should_cancel=false)
@@ -408,6 +424,21 @@ module ActiveMerchant #:nodoc:
           xml.tag! "status", "cancel" if should_cancel
           xml.tag! "amount", "0.00"
         end
+      end
+      
+      def add_custom_information(xml, custom_data)
+        xml.tag! "merchantDefinedData" do
+          custom_data.first(4).each_with_index do |item, idx|
+            xml.tag! "field#{idx+1}", item.to_s
+          end
+        end
+      end
+      
+      def add_create_service(xml)
+        xml.tag! "paySubscriptionCreateService", { 'run' => 'true' }
+      end
+      
+      def add_update_service(xml)
         xml.tag! "paySubscriptionUpdateService", { 'run' => 'true' }
       end
 
@@ -468,7 +499,7 @@ module ActiveMerchant #:nodoc:
         message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message] 
         authorization = success ? [ options[:order_id], response[:requestID], response[:requestToken] ].compact.join(";") : nil
 
-        Response.new(success, message, response, 
+        CyberSourceResponse.new(success, message, response, 
           :test => test?, 
           :authorization => authorization,
           :avs_result => { :code => response[:avsCode] },
