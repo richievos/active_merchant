@@ -3,9 +3,17 @@ module ActiveMerchant #:nodoc:
     # A convenience class that wraps Response and provides some readers for accessing
     # returned data from CyberSource in a more idiomatic manner.
     class CyberSourceResponse < Response
+      # The set of custom values stored with the Customer Profile when creating or 
+      # updating a Customer Profile.
       def custom_values
-        params.values_at('merchantDefinedDataField1', 'merchantDefinedDataField2', 'merchantDefinedDataField3', 'merchantDefinedDataField4').compact
+        params.values_at('merchantDefinedDataField1', 'merchantDefinedDataField2', 
+          'merchantDefinedDataField3', 'merchantDefinedDataField4').compact
       end
+      
+      # A returned token from CyberSource that identifies a Customer Profile. Any 
+      # further interactions with the Profile (updating, cancelling, authorizing-with)
+      # must use this token.
+      def token; params["subscriptionID"]; end
     end
     
     # See the remote and mocked unit test files for example usage.  Pay special attention to the contents of the options hash.
