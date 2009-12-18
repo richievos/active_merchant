@@ -326,8 +326,10 @@ module ActiveMerchant #:nodoc:
         add_address(xml, creditcard, options[:billing_address], options)
         add_purchase_data(xml, money, true, options)
         add_creditcard(xml, creditcard)
+        add_store_information(xml) if options[:persist]
         add_purchase_service(xml, options)
         add_business_rules_data(xml)
+        add_create_service(xml) if options[:persist]
         xml.target!
       end
       
