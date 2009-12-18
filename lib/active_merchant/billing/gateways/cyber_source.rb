@@ -44,12 +44,13 @@ module ActiveMerchant #:nodoc:
       self.display_name = 'CyberSource'
   
       # map credit card to the CyberSource expected representation
+      cattr_accessor :credit_card_codes
       @@credit_card_codes = {
         :visa  => '001',
         :master => '002',
         :american_express => '003',
         :discover => '004'
-      } 
+      }
 
       # map response codes to something humans can read
       @@response_codes = {
@@ -247,8 +248,10 @@ module ActiveMerchant #:nodoc:
         add_address(xml, creditcard, options[:billing_address], options)
         add_purchase_data(xml, money, true, options)
         add_creditcard(xml, creditcard)
+        add_store_information(xml) if options[:persist]
         add_auth_service(xml)
         add_business_rules_data(xml)
+        add_create_service(xml) if options[:persist]
         xml.target!
       end
       

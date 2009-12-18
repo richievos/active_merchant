@@ -239,6 +239,12 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_equal ["boo", "cry"], response.custom_values
   end
   
+  def test_authorize_and_persist_should_parse_token_from_response
+    @gateway.expects(:ssl_post).returns(successful_auth_and_create_profile_response)
+    response = @gateway.authorize(@amount, @credit_card, @options.merge(:persist => true))
+    assert_equal "2611513342530008402433", response.token
+  end
+  
 private
 
   def auth_request
@@ -353,6 +359,14 @@ private
     <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-11837645"><wsu:Created>2009-12-15T00:43:17.804Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>CANCELLED</c:merchantReferenceCode><c:requestID>2608377977790008299530</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhijLwSRGs0IPgraXSAUIpve8Dq1wBJCIzaSZV0ekqCaAAAA8AEd</c:requestToken><c:paySubscriptionUpdateReply><c:reasonCode>102</c:reasonCode></c:paySubscriptionUpdateReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def successful_auth_and_create_profile_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-611388"><wsu:Created>2009-12-18T15:48:54.340Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123499</c:merchantReferenceCode><c:requestID>2611513342530008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahj/7wSRGyQOWUfcWJQCIkGzlk5atmzKszcS4LdtTTZJ+02NgCmyT9psbNII4agkiIZNJMq6PSVBNgTkRskDllH3FiUAgAAA1gre</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccAuthReply><c:reasonCode>100</c:reasonCode><c:amount>1000.00</c:amount><c:authorizationCode>888888</c:authorizationCode><c:avsCode>X</c:avsCode><c:avsCodeRaw>I1</c:avsCodeRaw><c:authorizedDateTime>2009-12-18T15:48:54Z</c:authorizedDateTime><c:processorResponse>100</c:processorResponse><c:reconciliationID>69295662V38KA76S</c:reconciliationID></c:ccAuthReply><c:paySubscriptionCreateReply><c:reasonCode>100</c:reasonCode><c:subscriptionID>2611513342530008402433</c:subscriptionID></c:paySubscriptionCreateReply></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
 end
