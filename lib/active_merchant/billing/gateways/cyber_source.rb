@@ -1,5 +1,6 @@
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
+    
     # A convenience class that wraps Response and provides some readers for accessing
     # returned data from CyberSource in a more idiomatic manner.
     class CyberSourceResponse < Response
@@ -94,21 +95,19 @@ module ActiveMerchant #:nodoc:
         :r255 => "Your CyberSource account is not configured to process the service in the country you specified" 
       }
 
-      # These are the options that can be used when creating a new CyberSource Gateway object.
+      # Creates a new CyberSourceGateway object.
+      #
+      # This call requires:
       # 
-      # :login =>  your username 
+      # - :login =>  your username 
+      # - :password =>  the transaction key you generated in the Business Center       
       #
-      # :password =>  the transaction key you generated in the Business Center       
-      #
-      # :test => true   sets the gateway to test mode
-      #
-      # :vat_reg_number => your VAT registration number  
-      #
-      # :nexus => "WI CA QC" sets the states/provinces where you have a physical presense for tax purposes
-      #
-      # :ignore_avs => true   don't want to use AVS so continue processing even if AVS would have failed 
-      #
-      # :ignore_cvv => true   don't want to use CVV so continue processing even if CVV would have failed 
+      # This call allows: 
+      # - :test => true   sets the gateway to test mode
+      # - :vat_reg_number => your VAT registration number
+      # - :nexus => "WI CA QC" sets the states/provinces where you have a physical presense for tax purposes
+      # - :ignore_avs => true   don't want to use AVS so continue processing even if AVS would have failed 
+      # - :ignore_cvv => true   don't want to use CVV so continue processing even if CVV would have failed 
       def initialize(options = {})
         requires!(options, :login, :password)
         @options = options
@@ -120,13 +119,28 @@ module ActiveMerchant #:nodoc:
         @options[:test] || Base.gateway_mode == :test
       end
       
-      # Request an authorization for an amount from CyberSource 
+      
+      # Allows for authorizing a payment against a CreditCard.
       #
-      # You must supply an :order_id and an :email in the options hash.
+      # This call requires:
+      # - an amount of money (as a Money object or positive integer)
+      # - a valid CreditCard object
+      # - an options hash containing at least:
+      #   - a :billing_address
+      #   - an :order_id
+      #   - a valid :email address
       #
-      # You may further pass a :currency option. This should be a 3-letter code (as noted in
-      # http://apps.cybersource.com/library/documentation/sbc/quickref/currencies.pdf) that
-      # details the currency of this transaction. If this is left out, the default is "USD".
+      # This call allows:
+      # - a :persist in the options hash. If set to true, the customer information will be saved,
+      #   and a  token (available via response.token) will be returned for usage in future 
+      #   transactions.
+      # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD". 
+      #   A full list of supported currency codes is available at:
+      #   http://apps.cybersource.com/library/documentation/sbc/quickref/currencies.pdf
+      # - a :custom in the options hash. This can be an Array of up to four items that will
+      #   be sent to CyberSource for storage along with the rest of the customer Profile information.
+      #   Note that each item in the Array will have to_s called on it, so plan for your own
+      #   mapping/serialization carefully.
       def authorize(money, creditcard, options = {})
         requires!(options, :order_id, :email)
         setup_address_hash(options)
@@ -139,8 +153,9 @@ module ActiveMerchant #:nodoc:
         commit(build_capture_request(money, authorization, options), options)
       end
 
-      # Purchase is an auth followed by a capture. Note that this call follows the same 
-      # restrictions and allowances of options as authorize.
+      # Allows for a combined authorize and capture.
+      #
+      # This call has the same requirements and options as authorize.
       def purchase(money, creditcard, options = {})
         requires!(options, :order_id, :email)
         setup_address_hash(options)
@@ -165,9 +180,9 @@ module ActiveMerchant #:nodoc:
       # This call allows:
       # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD".
       # - a :custom option in the options hash. This can be an Array of up to four items that will
-      # be sent to CyberSource for storage along with the rest of the customer Profile information.
-      # Note that each item in the Array will have to_s called on it, so plan for your own
-      # mapping/serialization carefully.
+      #   be sent to CyberSource for storage along with the rest of the customer Profile information.
+      #   Note that each item in the Array will have to_s called on it, so plan for your own
+      #   mapping/serialization carefully.
       def store(creditcard, options = {})
         setup_address_hash(options)
         commit(build_store_request(creditcard, options), options)
@@ -176,7 +191,7 @@ module ActiveMerchant #:nodoc:
       # Allows for retrieving stored Profile information.
       #
       # This call requires:
-      # - a subscription_id from CyberSource (retrieved when using store to create a Profile).
+      # - a token from CyberSource (retrieved when using store to create a Profile).
       def retrieve(identification, options={})
         commit(build_retrieve_request(identification, options), options)
       end
@@ -184,11 +199,11 @@ module ActiveMerchant #:nodoc:
       # Allows for updating stored Profile information.
       #
       # This call requires:
-      # - a subscription_id from CyberSource (retrieved when using store to create a Profile).
+      # - a token from CyberSource (retrieved when using store to create a Profile).
       #
       # This call allows:
       # - a valid credit card object be specified in the options hash (as with the first 
-      # parameter to store) as :credit_card
+      #   parameter to store) as :credit_card
       # - an address be specified in the options hash (as with authorize)
       def update(identification, options={})
         commit(build_update_request(identification, options), options)
@@ -201,7 +216,7 @@ module ActiveMerchant #:nodoc:
       # address (credit card numbers are masked).
       #
       # This call requires:
-      # - a subscription_id from CyberSource (retrieved when using store to create a Profile).
+      # - a token from CyberSource (retrieved when using store to create a Profile).
       def unstore(identification, options={})
         commit(build_unstore_request(identification, options), options)
       end
