@@ -170,13 +170,14 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
   end
   
   def test_successful_retrieve
-    store_response = @gateway.store(@credit_card, @options.merge(:email => "123fake@example.com"))
+    new_options = @options.merge(:email => "123fake@example.com")
+    store_response = @gateway.store(@credit_card, new_options)
     response = @gateway.retrieve(store_response.token)
     
     assert response.test?
     assert_success response
 
-    assert_equal "123fake@example.com", response.params["email"]
+    assert_stored_customer(response, @credit_card, new_options)
   end
 
   def test_unsuccessful_retrieve
@@ -203,8 +204,7 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert response.test?
 
     retrieve_response = @gateway.retrieve(store_response.token)
-    assert retrieve_response.params["cardAccountNumber"].starts_with?("5555")
-    assert_equal "321contact@example.com", retrieve_response.params["email"]
+    assert_stored_customer(retrieve_response, new_credit_card, @options.merge(new_options))
   end
   
   def test_just_updating_address_should_be_successful
@@ -268,5 +268,53 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert response.test?
 
     assert_equal ["changed!", "555", "642", "snap-crackle-pop"], response.custom_values
+  end
+  
+  def test_authorize_and_persist_should_store_information
+    response = @gateway.authorize(@amount, @credit_card, @options.merge(:persist => true))
+    assert_success response
+    assert response.test?
+    
+    assert !response.token.blank?
+    retrieve_response = @gateway.retrieve(response.token)
+    
+    assert_equal response.token, retrieve_response.token
+    assert_stored_customer(retrieve_response, @credit_card, @options)
+  end
+  
+private
+
+  def assert_stored_customer(response, credit_card, options)
+    assert_stored_address(response, options[:billing_address])
+    assert_stored_credit_card(response, credit_card)
+    assert_stored_personal_information(response, credit_card, options[:email])
+    assert_equal "CURRENT", response.params["status"]
+  end
+  
+  def assert_stored_address(response, billing_address)
+    assert_equal billing_address[:city], response.params["city"]
+    assert_equal billing_address[:address1], response.params["street1"]
+    assert_equal billing_address[:address2], response.params["street2"]
+    assert_equal billing_address[:country], response.params["country"]
+    assert_equal billing_address[:state], response.params["state"]
+    assert_equal billing_address[:zip], response.params["postalCode"]
+  end
+  
+  def assert_stored_credit_card(response, credit_card)
+    assert_equal credit_card.year.to_s, response.params["cardExpirationYear"]
+    assert_equal sprintf("%02d", credit_card.month), response.params["cardExpirationMonth"]
+
+    credit_card_code = CyberSourceGateway.credit_card_codes[credit_card.type.to_sym]
+    assert_equal credit_card_code, response.params["cardType"]
+
+    assert response.params["cardAccountNumber"].starts_with?(credit_card.number.to_s.first(4))
+    assert response.params["cardAccountNumber"].ends_with?(credit_card.number.to_s.last(4))
+  end
+  
+  def assert_stored_personal_information(response, credit_card, email)
+    assert_equal email, response.params["email"]
+    assert_equal credit_card.first_name.upcase, response.params["firstName"]
+    assert_equal credit_card.last_name.upcase, response.params["lastName"]
+    assert_equal "USD", response.params["currency"]
   end
 end
