@@ -282,6 +282,18 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_stored_customer(retrieve_response, @credit_card, @options)
   end
   
+  def test_purchase_and_persist_should_store_information
+    response = @gateway.purchase(@amount, @credit_card, @options.merge(:persist => true))
+    assert_success response
+    assert response.test?
+    
+    assert !response.token.blank?
+    retrieve_response = @gateway.retrieve(response.token)
+    
+    assert_equal response.token, retrieve_response.token
+    assert_stored_customer(retrieve_response, @credit_card, @options)
+  end
+  
 private
 
   def assert_stored_customer(response, credit_card, options)
