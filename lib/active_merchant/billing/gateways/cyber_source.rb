@@ -120,11 +120,11 @@ module ActiveMerchant #:nodoc:
       end
       
       
-      # Allows for authorizing a payment against a CreditCard.
+      # Allows for authorizing a payment against a credit_card.
       #
       # This call requires:
       # - an amount of money (as a Money object or positive integer)
-      # - a valid CreditCard object
+      # - a valid credit_card object
       # - an options hash containing at least:
       #   - a :billing_address
       #   - an :order_id
@@ -141,10 +141,10 @@ module ActiveMerchant #:nodoc:
       #   be sent to CyberSource for storage along with the rest of the customer Profile information.
       #   Note that each item in the Array will have to_s called on it, so plan for your own
       #   mapping/serialization carefully.
-      def authorize(money, creditcard, options = {})
+      def authorize(money, credit_card, options = {})
         requires!(options, :order_id, :email)
         setup_address_hash(options)
-        commit(build_auth_request(money, creditcard, options), options )
+        commit(build_auth_request(money, credit_card, options), options )
       end
 
       # Capture an authorization that has previously been requested
@@ -156,10 +156,10 @@ module ActiveMerchant #:nodoc:
       # Allows for a combined authorize and capture.
       #
       # This call has the same requirements and options as authorize.
-      def purchase(money, creditcard, options = {})
+      def purchase(money, credit_card, options = {})
         requires!(options, :order_id, :email)
         setup_address_hash(options)
-        commit(build_purchase_request(money, creditcard, options), options)
+        commit(build_purchase_request(money, credit_card, options), options)
       end
       
       def void(identification, options = {})
@@ -183,9 +183,9 @@ module ActiveMerchant #:nodoc:
       #   be sent to CyberSource for storage along with the rest of the customer Profile information.
       #   Note that each item in the Array will have to_s called on it, so plan for your own
       #   mapping/serialization carefully.
-      def store(creditcard, options = {})
+      def store(credit_card, options = {})
         setup_address_hash(options)
-        commit(build_store_request(creditcard, options), options)
+        commit(build_store_request(credit_card, options), options)
       end
       
       # Allows for retrieving stored Profile information.
@@ -245,10 +245,10 @@ module ActiveMerchant #:nodoc:
       #
       # This functionality is only supported by this particular gateway may
       # be changed at any time
-      def calculate_tax(creditcard, options)
+      def calculate_tax(credit_card, options)
         requires!(options,  :line_items)
         setup_address_hash(options)
-        commit(build_tax_calculation_request(creditcard, options), options)
+        commit(build_tax_calculation_request(credit_card, options), options)
       end
       
       private                       
@@ -258,11 +258,11 @@ module ActiveMerchant #:nodoc:
         options[:shipping_address] = options[:shipping_address] || {}
       end
       
-      def build_auth_request(money, creditcard, options)
+      def build_auth_request(money, credit_card, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_address(xml, creditcard, options[:billing_address], options)
+        add_address(xml, credit_card, options[:billing_address], options)
         add_purchase_data(xml, money, true, options)
-        add_creditcard(xml, creditcard)
+        add_credit_card(xml, credit_card)
         add_store_information(xml) if options[:persist]
         add_auth_service(xml)
         add_business_rules_data(xml)
@@ -270,11 +270,11 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
       
-      def build_store_request(creditcard, options)
+      def build_store_request(credit_card, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_address(xml, creditcard, options[:billing_address], options)
+        add_address(xml, credit_card, options[:billing_address], options)
         add_purchase_data(xml, 0, false)
-        add_creditcard(xml, creditcard)
+        add_credit_card(xml, credit_card)
         add_store_information(xml)
         add_custom_information(xml, options[:custom]) unless options[:custom].blank?
         add_create_service(xml)
@@ -284,7 +284,7 @@ module ActiveMerchant #:nodoc:
       def build_update_request(identification, options)
         xml = Builder::XmlMarkup.new :indent => 2
         add_address(xml, options[:credit_card], options[:billing_address], options) if options[:billing_address]
-        add_creditcard(xml, options[:credit_card]) if options[:credit_card]
+        add_credit_card(xml, options[:credit_card]) if options[:credit_card]
         add_update_information(xml, identification)
         add_custom_information(xml, options[:custom]) unless options[:custom].blank?
         add_update_service(xml)
@@ -314,10 +314,10 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
 
-      def build_tax_calculation_request(creditcard, options)
+      def build_tax_calculation_request(credit_card, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_address(xml, creditcard, options[:billing_address], options, false)
-        add_address(xml, creditcard, options[:shipping_address], options, true)
+        add_address(xml, credit_card, options[:billing_address], options, false)
+        add_address(xml, credit_card, options[:shipping_address], options, true)
         add_line_item_data(xml, options)
         add_purchase_data(xml, 0, false, options)
         add_tax_service(xml)
@@ -336,11 +336,11 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end 
 
-      def build_purchase_request(money, creditcard, options)
+      def build_purchase_request(money, credit_card, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_address(xml, creditcard, options[:billing_address], options)
+        add_address(xml, credit_card, options[:billing_address], options)
         add_purchase_data(xml, money, true, options)
-        add_creditcard(xml, creditcard)
+        add_credit_card(xml, credit_card)
         add_store_information(xml) if options[:persist]
         add_purchase_service(xml, options)
         add_business_rules_data(xml)
@@ -404,10 +404,10 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_address(xml, creditcard, address, options, shipTo = false)      
+      def add_address(xml, credit_card, address, options, shipTo = false)      
         xml.tag! shipTo ? 'shipTo' : 'billTo' do
-          xml.tag! 'firstName', creditcard.first_name if creditcard
-          xml.tag! 'lastName', creditcard.last_name if creditcard
+          xml.tag! 'firstName', credit_card.first_name if credit_card
+          xml.tag! 'lastName', credit_card.last_name if credit_card
           xml.tag! 'street1', address[:address1]
           xml.tag! 'street2', address[:address2]
           xml.tag! 'city', address[:city]
@@ -418,13 +418,13 @@ module ActiveMerchant #:nodoc:
         end 
       end
 
-      def add_creditcard(xml, creditcard)      
+      def add_credit_card(xml, credit_card)      
         xml.tag! 'card' do
-          xml.tag! 'accountNumber', creditcard.number
-          xml.tag! 'expirationMonth', format(creditcard.month, :two_digits)
-          xml.tag! 'expirationYear', format(creditcard.year, :four_digits)
-          xml.tag!('cvNumber', creditcard.verification_value) unless (@options[:ignore_cvv] || creditcard.verification_value.blank? )
-          xml.tag! 'cardType', @@credit_card_codes[card_brand(creditcard).to_sym]
+          xml.tag! 'accountNumber', credit_card.number
+          xml.tag! 'expirationMonth', format(credit_card.month, :two_digits)
+          xml.tag! 'expirationYear', format(credit_card.year, :four_digits)
+          xml.tag!('cvNumber', credit_card.verification_value) unless (@options[:ignore_cvv] || credit_card.verification_value.blank? )
+          xml.tag! 'cardType', @@credit_card_codes[card_brand(credit_card).to_sym]
         end
       end
 
