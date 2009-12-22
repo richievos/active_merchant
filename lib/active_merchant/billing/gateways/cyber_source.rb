@@ -195,11 +195,13 @@ module ActiveMerchant #:nodoc:
       #
       # This call requires:
       # - an amount of money (as a Money object or positive integer) to credit
-      # - an authorization code (e.g. received from the result of an authorize call)
+      # - either:
+      #   - an authorization code (e.g. received from the result of an authorize call)
+      #   - a token from CyberSource (retrieved from the store API call)
       #
       # This call does not allow any options to speak of.
-      def credit(money, identification, options = {})
-        commit(build_credit_request(money, identification, options), options)
+      def credit(money, identification_or_token, options = {})
+        commit(build_credit_request(money, identification_or_token, options), options)
       end
       
       # Allows for storing credit card information. In CyberSource, this is done behind the scenes by 
@@ -414,15 +416,30 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
 
-      def build_credit_request(money, identification, options)
-        order_id, request_id, request_token = identification.split(";")
-        options[:order_id] = order_id
-        
+      def build_credit_request(money, identification_or_token, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_purchase_data(xml, money, true, options)
-        add_credit_service(xml, request_id, request_token)
+
+        if identification_or_token =~ /.+;.+;.+/
+          build_credit_request_from_authorization(xml, money, identification_or_token, options)
+        else
+          build_credit_request_from_profile(xml, money, identification_or_token)
+        end
         
         xml.target!
+      end
+      
+      def build_credit_request_from_profile(xml, money, token)
+        add_purchase_data(xml, money, true, { :order_id => Time.now.to_i })
+        add_recurring_subscription_info(xml, token)
+        add_credit_service(xml, nil, nil)
+      end
+      
+      def build_credit_request_from_authorization(xml, money, identification, options)
+        order_id, request_id, request_token = identification.split(";")
+        options[:order_id] = order_id
+
+        add_purchase_data(xml, money, true, options)
+        add_credit_service(xml, request_id, request_token)
       end
 
       def add_business_rules_data(xml)
@@ -554,8 +571,8 @@ module ActiveMerchant #:nodoc:
 
       def add_credit_service(xml, request_id, request_token)
         xml.tag! 'ccCreditService', {'run' => 'true'} do
-          xml.tag! 'captureRequestID', request_id
-          xml.tag! 'captureRequestToken', request_token
+          xml.tag! 'captureRequestID', request_id if request_id
+          xml.tag! 'captureRequestToken', request_token if request_token
         end
       end
       
