@@ -44,7 +44,7 @@ module ActiveMerchant #:nodoc:
       self.homepage_url = 'http://www.cybersource.com'
       self.display_name = 'CyberSource'
   
-      # map credit card to the CyberSource expected representation
+      # map CreditCard to the CyberSource expected representation
       cattr_accessor :credit_card_codes
       @@credit_card_codes = {
         :visa  => '001',
@@ -100,7 +100,7 @@ module ActiveMerchant #:nodoc:
       # This call requires:
       # 
       # - :login =>  your username 
-      # - :password =>  the transaction key you generated in the Business Center       
+      # - :password =>  the transaction key you generated in the Business Center
       #
       # This call allows: 
       # - :test => true   sets the gateway to test mode
@@ -114,11 +114,11 @@ module ActiveMerchant #:nodoc:
         super
       end  
 
-      # Should run against the test servers or not?
+      # Returns true if transactions will run against CyberSource's test gateway. Note that if this option
+      # is specified, it will override the setting of Base.gateway_mode.
       def test?
         @options[:test] || Base.gateway_mode == :test
       end
-      
       
       # Allows for authorizing a payment against a credit_card.
       #
@@ -132,7 +132,7 @@ module ActiveMerchant #:nodoc:
       #     - a valid :email address
       # - or
       #   - a token from CyberSource (retrieved from the store API call) that is linked to a 
-      #     valid credit card
+      #     valid CreditCard
       #   - an options hash containing at least an :order_id key
       #
       # This call allows:
@@ -147,12 +147,20 @@ module ActiveMerchant #:nodoc:
       #   Note that each item in the Array will have to_s called on it, so plan for your own
       #   mapping/serialization carefully.
       def authorize(money, credit_card_or_token, options = {})
+         # :order_id is always required. :email is only required if using a credit card, so we check 
+         # it in build_auth_request instead of here.
         requires!(options, :order_id)
         setup_address_hash(options)
         commit(build_auth_request(money, credit_card_or_token, options), options )
       end
 
-      # Capture an authorization that has previously been requested
+      # Allows for capturing an authorization.
+      # 
+      # This call requires:
+      # - an amount of money equal to or less than the amount of the authorization
+      # - an authorization code (e.g. received from the result of an authorize call)
+      #
+      # This call does not allow any options to speak of.
       def capture(money, authorization, options = {})
         setup_address_hash(options)
         commit(build_capture_request(money, authorization, options), options)
@@ -167,10 +175,27 @@ module ActiveMerchant #:nodoc:
         commit(build_purchase_request(money, credit_card, options), options)
       end
       
+      # Allows for a void of a previous transaction.
+      #
+      # This call requires:
+      # - an authorization code (e.g. received from the result of an authorize call)
+      #
+      # This call does not allow any options to speak of.
+      #-----
+      # Note: in test mode, it appears that this request always fails with error code 246:
+      # "The capture or credit is not voidable because the capture or credit information 
+      # has already been submitted to your processor"
       def void(identification, options = {})
         commit(build_void_request(identification, options), options)
       end
 
+      # Allows for a credit of a previous transaction.
+      #
+      # This call requires:
+      # - an amount of money (as a Money object or positive integer) to credit
+      # - an authorization code (e.g. received from the result of an authorize call)
+      #
+      # This call does not allow any options to speak of.
       def credit(money, identification, options = {})
         commit(build_credit_request(money, identification, options), options)
       end
@@ -179,7 +204,7 @@ module ActiveMerchant #:nodoc:
       # creating a Profile.
       #
       # This call requires:
-      # - a valid credit card (storage of invalid cards is not allowed)
+      # - a valid CreditCard (storage of invalid cards is not allowed)
       # - an address be specified in the options hash (as with authorize)
       #
       # This call allows:
@@ -197,6 +222,8 @@ module ActiveMerchant #:nodoc:
       #
       # This call requires:
       # - a token from CyberSource (retrieved when using store to create a Profile).
+      #
+      # This call does not allow any options to speak of.
       def retrieve(identification, options={})
         commit(build_retrieve_request(identification, options), options)
       end
@@ -207,7 +234,7 @@ module ActiveMerchant #:nodoc:
       # - a token from CyberSource (retrieved when using store to create a Profile).
       #
       # This call allows:
-      # - a valid credit card object be specified in the options hash (as with the first 
+      # - a valid CreditCard object be specified in the options hash (as with the first 
       #   parameter to store) as :credit_card
       # - an address be specified in the options hash (as with authorize)
       def update(identification, options={})
@@ -222,14 +249,17 @@ module ActiveMerchant #:nodoc:
       #
       # This call requires:
       # - a token from CyberSource (retrieved when using store to create a Profile).
+      #
+      # This call does not allow any options to speak of.
       def unstore(identification, options={})
         commit(build_unstore_request(identification, options), options)
       end
 
-      # CyberSource requires that you provide line item information for tax calculations
-      # If you do not have prices for each item or want to simplify the situation then pass in one fake line item that costs the subtotal of the order
-      #
-      # The line_item hash goes in the options hash and should look like 
+      # Allows for calculating of tax based on line-item detail.
+      # 
+      # This call requires:
+      # - a valid CreditCard
+      # - a :line_items option in the option hash that should look like the following:
       # 
       #         :line_items => [
       #           {
@@ -247,16 +277,20 @@ module ActiveMerchant #:nodoc:
       #             :sku => 'FAKE1232132113123'
       #           }
       #         ]
+      # 
+      # If you do not have prices for each item or want to simplify the situation then pass in 
+      # one fake line item that costs the subtotal of the order.
       #
-      # This functionality is only supported by this particular gateway may
-      # be changed at any time
+      # This functionality is only supported by this particular gateway may and be changed at 
+      # any time
       def calculate_tax(credit_card, options)
         requires!(options,  :line_items)
         setup_address_hash(options)
         commit(build_tax_calculation_request(credit_card, options), options)
       end
       
-      private                       
+    private
+    
       # Create all address hash key value pairs so that we still function if we were only provided with one or two of them 
       def setup_address_hash(options)
         options[:billing_address] = options[:billing_address] || options[:address] || {}
