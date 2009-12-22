@@ -265,6 +265,26 @@ class CyberSourceTest < Test::Unit::TestCase
     assert response.test?
   end
   
+  def test_purchase_using_token
+    @gateway.expects(:ssl_post).returns(successful_purchase_using_token_response)
+    response = @gateway.purchase(@amount, "2611552700460008299530", @options)
+
+    assert_success response
+    assert response.test?
+    
+    assert !response.authorization.blank?
+  end
+
+  def test_purchase_using_token_with_incorrect_token
+    @gateway.expects(:ssl_post).returns(unsuccessful_purchase_using_token_response)
+    response = @gateway.purchase(@amount, "fake-token-here", @options)
+
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
+  end
+  
 private
 
   def auth_request
@@ -411,6 +431,22 @@ private
     <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-8877718"><wsu:Created>2009-12-22T15:05:10.643Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:requestID>2614943105590008299530</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhhBLwSRG4NAR/GKcoAVpEkYjNpJlXR6SoJozgZz</c:requestToken></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def successful_purchase_using_token_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-28957907"><wsu:Created>2009-12-22T16:09:05.787Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123499</c:merchantReferenceCode><c:requestID>2614981452600008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahj//wSRG4RQwL+U9MwCIkGzlozbOWLGszcS4jSJBTZJ/GIYQCmyT+MQwtIITiBJGQyaSZV0ekqCaGBORG4RQwL+U9MwCAAA9wyG</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccAuthReply><c:reasonCode>100</c:reasonCode><c:amount>400.00</c:amount><c:authorizationCode>888888</c:authorizationCode><c:avsCode>X</c:avsCode><c:avsCodeRaw>I1</c:avsCodeRaw><c:authorizedDateTime>2009-12-22T16:09:05Z</c:authorizedDateTime><c:processorResponse>100</c:processorResponse><c:reconciliationID>69436911V38KD4DA</c:reconciliationID></c:ccAuthReply><c:ccCaptureReply><c:reasonCode>100</c:reasonCode><c:requestDateTime>2009-12-22T16:09:05Z</c:requestDateTime><c:amount>400.00</c:amount><c:reconciliationID>69436911V38KD4DA</c:reconciliationID></c:ccCaptureReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def unsuccessful_purchase_using_token_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-5569932"><wsu:Created>2009-12-22T16:09:37.092Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:requestID>2614981770500008402433</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhhBLwSRG4RTAwFOGrwDpEkYjNpJlXR6SoJozAZz</c:requestToken></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
 end
