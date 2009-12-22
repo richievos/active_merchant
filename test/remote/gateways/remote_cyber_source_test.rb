@@ -321,6 +321,25 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_equal "One or more fields contains invalid data", response.message
   end
   
+  def test_purchase_using_token
+    store_response = @gateway.store(@credit_card, @options)
+    response = @gateway.purchase(@amount, store_response.token, @options)
+
+    assert_success response
+    assert response.test?
+    
+    assert_equal "1.00", response.params["amount"]
+  end
+
+  def test_purchase_using_token_with_incorrect_token
+    response = @gateway.purchase(@amount, "fake-token-here", @options)
+
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
+  end
+  
 private
 
   def assert_stored_customer(response, credit_card, options)

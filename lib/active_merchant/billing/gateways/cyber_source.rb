@@ -169,10 +169,12 @@ module ActiveMerchant #:nodoc:
       # Allows for a combined authorize and capture.
       #
       # This call has the same requirements and options as authorize.
-      def purchase(money, credit_card, options = {})
-        requires!(options, :order_id, :email)
+      def purchase(money, credit_card_or_token, options = {})
+        # :order_id is always required. :email is only required if using a credit card, so we check 
+        # it in build_purchase_request instead of here.
+        requires!(options, :order_id)
         setup_address_hash(options)
-        commit(build_purchase_request(money, credit_card, options), options)
+        commit(build_purchase_request(money, credit_card_or_token, options), options)
       end
       
       # Allows for a void of a previous transaction.
@@ -383,15 +385,23 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end 
 
-      def build_purchase_request(money, credit_card, options)
+      def build_purchase_request(money, credit_card_or_token, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_address(xml, credit_card, options[:billing_address], options)
-        add_purchase_data(xml, money, true, options)
-        add_credit_card(xml, credit_card)
-        add_store_information(xml) if options[:persist]
-        add_purchase_service(xml, options)
-        add_business_rules_data(xml)
-        add_create_service(xml) if options[:persist]
+        
+        if credit_card_or_token.respond_to?(:display_number)
+          requires!(options, :email)
+          add_address(xml, credit_card_or_token, options[:billing_address], options)
+          add_purchase_data(xml, money, true, options)
+          add_credit_card(xml, credit_card_or_token)
+          add_store_information(xml) if options[:persist]
+          add_purchase_service(xml)
+          add_business_rules_data(xml)
+          add_create_service(xml) if options[:persist]
+        else
+          add_purchase_data(xml, money, true, options)
+          add_recurring_subscription_info(xml, credit_card_or_token)
+          add_purchase_service(xml)
+        end
         xml.target!
       end
       
@@ -530,7 +540,7 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_purchase_service(xml, options)
+      def add_purchase_service(xml)
         xml.tag! 'ccAuthService', {'run' => 'true'}
         xml.tag! 'ccCaptureService', {'run' => 'true'}
       end
