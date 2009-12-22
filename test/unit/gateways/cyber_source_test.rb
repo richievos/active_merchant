@@ -258,7 +258,7 @@ class CyberSourceTest < Test::Unit::TestCase
     assert response.test?
   end
 
-  def test_authorize_using_token_with_incorrect_token
+  def test_authorize_using_token_with_incorrect_token_should_fail
     @gateway.expects(:ssl_post).returns(unsuccessful_authorize_using_token_response)
     response = @gateway.authorize(@amount, "fake-token-here", @options)
     assert_failure response
@@ -275,10 +275,28 @@ class CyberSourceTest < Test::Unit::TestCase
     assert !response.authorization.blank?
   end
 
-  def test_purchase_using_token_with_incorrect_token
+  def test_purchase_using_token_with_incorrect_token_should_fail
     @gateway.expects(:ssl_post).returns(unsuccessful_purchase_using_token_response)
     response = @gateway.purchase(@amount, "fake-token-here", @options)
 
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
+  end
+  
+  def test_credit_using_token
+    @gateway.expects(:ssl_post).returns(successful_credit_using_token_response)
+    response = @gateway.credit(@amount, "2611552700460008299530", @options)
+
+    assert_success response
+    assert response.test?
+  end
+  
+  def test_credit_using_token_with_incorrect_token_should_fail
+    @gateway.expects(:ssl_post).returns(unsuccessful_credit_using_token_response)
+    response = @gateway.credit(@amount, "fake-token-here", @options)
+    
     assert_failure response
     assert response.test?
     
@@ -447,6 +465,22 @@ private
     <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-5569932"><wsu:Created>2009-12-22T16:09:37.092Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:requestID>2614981770500008402433</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhhBLwSRG4RTAwFOGrwDpEkYjNpJlXR6SoJozAZz</c:requestToken></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def successful_credit_using_token_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-33319815"><wsu:Created>2009-12-22T16:25:43.057Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2614991427750008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahj/fwSRG4SXoXDFnmQCIkGzlozbtGLSszcS4jSXSTZJ/GMQoCmyT+MYhdIFfRJGQyaSZV0ekqCaUBMAP0J0</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccCreditReply><c:reasonCode>100</c:reasonCode><c:requestDateTime>2009-12-22T16:25:42Z</c:requestDateTime><c:amount>10.00</c:amount><c:reconciliationID>69437414V38KD4KR</c:reconciliationID></c:ccCreditReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def unsuccessful_credit_using_token_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-14315492"><wsu:Created>2009-12-22T16:26:25.861Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:requestID>2614991858240008402433</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhhBLwSRG4SasH9MrWwDpEkYjNpJlXR6SoJoSAZc</c:requestToken></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
 end
