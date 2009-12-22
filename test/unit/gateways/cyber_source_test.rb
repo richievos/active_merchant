@@ -187,7 +187,7 @@ class CyberSourceTest < Test::Unit::TestCase
 
   def test_unsuccessful_retrieve_request
     @gateway.expects(:ssl_post).returns(unsuccessful_retrieve_response)
-    response = @gateway.retrieve("fake-subscription-id-here")
+    response = @gateway.retrieve("fake-token-here")
     
     assert_failure response
     assert response.test?
@@ -224,7 +224,7 @@ class CyberSourceTest < Test::Unit::TestCase
 
   def test_unsuccessful_unstore_request
     @gateway.expects(:ssl_post).returns(unsuccessful_unstore_response)
-    response = @gateway.unstore("fake-identification-here")
+    response = @gateway.unstore("fake-token-here")
 
     assert_failure response
     assert response.test?
@@ -249,6 +249,20 @@ class CyberSourceTest < Test::Unit::TestCase
     @gateway.expects(:ssl_post).returns(successful_purchase_and_create_profile_response)
     response = @gateway.purchase(@amount, @credit_card, @options.merge(:persist => true))
     assert_equal "2611552700460008299530", response.token
+  end
+  
+  def test_authorize_using_token
+    @gateway.expects(:ssl_post).returns(successful_authorize_using_token_response)
+    response = @gateway.authorize(@amount, "2611552700460008299530", @options)
+    assert_success response
+    assert response.test?
+  end
+
+  def test_authorize_using_token_with_incorrect_token
+    @gateway.expects(:ssl_post).returns(unsuccessful_authorize_using_token_response)
+    response = @gateway.authorize(@amount, "fake-token-here", @options)
+    assert_failure response
+    assert response.test?
   end
   
 private
@@ -384,4 +398,19 @@ private
     XML
   end
   
+  def successful_authorize_using_token_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-5198340"><wsu:Created>2009-12-22T15:06:17.187Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123499</c:merchantReferenceCode><c:requestID>2614943771330008299530</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahj/7wSRG4NFAuri33AUIkGzlozbNGLmOzcSq06GxTe+gkaA4Cm99BI0B9IITiBJGQyaSZV0ekqCbAnIjcGigXVxb7gKAAAA8QdL</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccAuthReply><c:reasonCode>100</c:reasonCode><c:amount>400.00</c:amount><c:authorizationCode>888888</c:authorizationCode><c:avsCode>X</c:avsCode><c:avsCodeRaw>I1</c:avsCodeRaw><c:authorizedDateTime>2009-12-22T15:06:17Z</c:authorizedDateTime><c:processorResponse>100</c:processorResponse><c:reconciliationID>69436419G38JVNC1</c:reconciliationID></c:ccAuthReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def unsuccessful_authorize_using_token_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-8877718"><wsu:Created>2009-12-22T15:05:10.643Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:requestID>2614943105590008299530</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhhBLwSRG4NAR/GKcoAVpEkYjNpJlXR6SoJozgZz</c:requestToken></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
 end

@@ -158,6 +158,14 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
 
     assert !response.token.blank?
   end
+  
+  def test_store_using_an_expired_card_should_fail
+    response = @gateway.store(credit_card('4111111111111111', :year => '1999'), @options)
+    assert_failure response
+    assert response.test?
+
+    assert_equal "Expired card", response.message
+  end
 
   def test_unsuccessful_store
     response = @gateway.store(@declined_card, @options)
@@ -292,6 +300,25 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     
     assert_equal response.token, retrieve_response.token
     assert_stored_customer(retrieve_response, @credit_card, @options)
+  end
+  
+  def test_authorize_using_token
+    store_response = @gateway.store(@credit_card, @options)
+    
+    response = @gateway.authorize(@amount, store_response.token, { :order_id => Time.now.to_i })
+    assert_success response
+    assert response.test?
+    
+    assert_equal "1.00", response.params["amount"]
+    assert_not_nil response.params["authorizationCode"]
+  end
+
+  def test_authorize_using_incorrect_token_should_fail
+    response = @gateway.authorize(@amount, "fake-token-here", @options)
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
   end
   
 private

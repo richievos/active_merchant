@@ -124,15 +124,20 @@ module ActiveMerchant #:nodoc:
       #
       # This call requires:
       # - an amount of money (as a Money object or positive integer)
-      # - a valid credit_card object
-      # - an options hash containing at least:
-      #   - a :billing_address
-      #   - an :order_id
-      #   - a valid :email address
+      # - either
+      #   - a valid credit_card object 
+      #   - an options hash containing at least:
+      #     - a :billing_address
+      #     - an :order_id
+      #     - a valid :email address
+      # - or
+      #   - a token from CyberSource (retrieved from the store API call) that is linked to a 
+      #     valid credit card
+      #   - an options hash containing at least an :order_id key
       #
       # This call allows:
       # - a :persist in the options hash. If set to true, the customer information will be saved,
-      #   and a  token (available via response.token) will be returned for usage in future 
+      #   and a token (available via response.token) will be returned for usage in future 
       #   transactions.
       # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD". 
       #   A full list of supported currency codes is available at:
@@ -141,10 +146,10 @@ module ActiveMerchant #:nodoc:
       #   be sent to CyberSource for storage along with the rest of the customer Profile information.
       #   Note that each item in the Array will have to_s called on it, so plan for your own
       #   mapping/serialization carefully.
-      def authorize(money, credit_card, options = {})
-        requires!(options, :order_id, :email)
+      def authorize(money, credit_card_or_token, options = {})
+        requires!(options, :order_id)
         setup_address_hash(options)
-        commit(build_auth_request(money, credit_card, options), options )
+        commit(build_auth_request(money, credit_card_or_token, options), options )
       end
 
       # Capture an authorization that has previously been requested
@@ -258,15 +263,25 @@ module ActiveMerchant #:nodoc:
         options[:shipping_address] = options[:shipping_address] || {}
       end
       
-      def build_auth_request(money, credit_card, options)
+      def build_auth_request(money, credit_card_or_token, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_address(xml, credit_card, options[:billing_address], options)
-        add_purchase_data(xml, money, true, options)
-        add_credit_card(xml, credit_card)
-        add_store_information(xml) if options[:persist]
-        add_auth_service(xml)
-        add_business_rules_data(xml)
-        add_create_service(xml) if options[:persist]
+        
+        if credit_card_or_token.respond_to?(:display_number)
+          requires!(options, :email)
+
+          add_address(xml, credit_card_or_token, options[:billing_address], options)
+          add_purchase_data(xml, money, true, options)
+          add_credit_card(xml, credit_card_or_token)
+          add_store_information(xml) if options[:persist]
+          add_auth_service(xml)
+          add_business_rules_data(xml)
+          add_create_service(xml) if options[:persist]
+        else
+          add_purchase_data(xml, money, true, options)
+          add_recurring_subscription_info(xml, credit_card_or_token)
+          add_auth_service(xml)
+        end
+
         xml.target!
       end
       
@@ -297,9 +312,7 @@ module ActiveMerchant #:nodoc:
         options[:order_id] = Time.now.to_i.to_s
         
         xml = Builder::XmlMarkup.new :indent => 2
-        xml.tag! "recurringSubscriptionInfo" do
-          xml.tag! "subscriptionID", identification
-        end
+        add_recurring_subscription_info(xml, identification)
         xml.tag! "paySubscriptionRetrieveService", { 'run' => 'true' }
         
         xml.target!
@@ -395,6 +408,12 @@ module ActiveMerchant #:nodoc:
         xml.tag! 'clientLibrary' ,'Ruby Active Merchant'
         xml.tag! 'clientLibraryVersion',  '1.0'
         xml.tag! 'clientEnvironment' , 'Linux'
+      end
+      
+      def add_recurring_subscription_info(xml, identification)
+        xml.tag! "recurringSubscriptionInfo" do
+          xml.tag! "subscriptionID", identification
+        end
       end
 
       def add_purchase_data(xml, money = 0, include_grand_total = false, options={})
