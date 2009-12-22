@@ -306,21 +306,28 @@ module ActiveMerchant #:nodoc:
         
         if credit_card_or_token.respond_to?(:display_number)
           requires!(options, :email)
-
-          add_address(xml, credit_card_or_token, options[:billing_address], options)
-          add_purchase_data(xml, money, true, options)
-          add_credit_card(xml, credit_card_or_token)
-          add_store_information(xml) if options[:persist]
-          add_auth_service(xml)
-          add_business_rules_data(xml)
-          add_create_service(xml) if options[:persist]
+          build_auth_request_from_credit_card(xml, money, credit_card_or_token, options)
         else
-          add_purchase_data(xml, money, true, options)
-          add_recurring_subscription_info(xml, credit_card_or_token)
-          add_auth_service(xml)
+          build_auth_request_from_profile(xml, money, credit_card_or_token, options)
         end
 
         xml.target!
+      end
+      
+      def build_auth_request_from_credit_card(xml, money, credit_card, options)
+        add_address(xml, credit_card, options[:billing_address], options)
+        add_purchase_data(xml, money, true, options)
+        add_credit_card(xml, credit_card)
+        add_store_information(xml) if options[:persist]
+        add_auth_service(xml)
+        add_business_rules_data(xml)
+        add_create_service(xml) if options[:persist]
+      end
+      
+      def build_auth_request_from_profile(xml, money, token, options)
+        add_purchase_data(xml, money, true, options)
+        add_recurring_subscription_info(xml, token)
+        add_auth_service(xml)
       end
       
       def build_store_request(credit_card, options)
@@ -392,19 +399,27 @@ module ActiveMerchant #:nodoc:
         
         if credit_card_or_token.respond_to?(:display_number)
           requires!(options, :email)
-          add_address(xml, credit_card_or_token, options[:billing_address], options)
-          add_purchase_data(xml, money, true, options)
-          add_credit_card(xml, credit_card_or_token)
-          add_store_information(xml) if options[:persist]
-          add_purchase_service(xml)
-          add_business_rules_data(xml)
-          add_create_service(xml) if options[:persist]
+          build_purchase_request_from_credit_card(xml, money, credit_card_or_token, options)
         else
-          add_purchase_data(xml, money, true, options)
-          add_recurring_subscription_info(xml, credit_card_or_token)
-          add_purchase_service(xml)
+          build_purchase_request_from_profile(xml, money, credit_card_or_token, options)
         end
         xml.target!
+      end
+      
+      def build_purchase_request_from_credit_card(xml, money, credit_card, options)
+        add_address(xml, credit_card, options[:billing_address], options)
+        add_purchase_data(xml, money, true, options)
+        add_credit_card(xml, credit_card)
+        add_store_information(xml) if options[:persist]
+        add_purchase_service(xml)
+        add_business_rules_data(xml)
+        add_create_service(xml) if options[:persist]
+      end
+      
+      def build_purchase_request_from_profile(xml, money, token, options)
+        add_purchase_data(xml, money, true, options)
+        add_recurring_subscription_info(xml, token)
+        add_purchase_service(xml)
       end
       
       def build_void_request(identification, options)
