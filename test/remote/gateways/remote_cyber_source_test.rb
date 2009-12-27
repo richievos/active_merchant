@@ -177,6 +177,27 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert response.token.blank?
   end
   
+  def test_store_should_succeed_when_given_an_authorization_code
+    response = @gateway.authorize(@amount, @credit_card, @options)
+    assert_success response
+    assert response.test?
+
+    store_response = @gateway.store(response.authorization, {})
+    assert_success store_response
+    assert store_response.test?
+    
+    retrieve_response = @gateway.retrieve(store_response.token, {})
+    assert_stored_customer(retrieve_response, @credit_card, @options)
+  end
+  
+  def test_store_should_fail_when_given_a_fake_authorization_code
+    response = @gateway.store('fake;authorization;here', {})
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
+  end
+  
   def test_successful_retrieve
     new_options = @options.merge(:email => "123fake@example.com")
     store_response = @gateway.store(@credit_card, new_options)
