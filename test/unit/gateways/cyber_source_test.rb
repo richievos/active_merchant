@@ -175,6 +175,27 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_equal "Invalid account number", response.message
   end
   
+  def test_store_should_succeed_when_given_an_authorization_code
+    @gateway.stubs(:ssl_post).returns(successful_authorization_response, successful_store_using_auth_response)
+    response = @gateway.authorize(@amount, @credit_card, @options)
+    assert_success response
+    assert response.test?
+
+    store_response = @gateway.store(response.authorization, {})
+    assert_success response
+    assert response.test?
+  end
+  
+  def test_store_should_fail_when_given_a_fake_authorization_code
+    @gateway.stubs(:ssl_post).returns(unsuccessful_store_using_auth_response)
+    
+    response = @gateway.store('fake-authorization-here', {})
+    assert_failure response
+    assert response.test?
+    
+    assert_equal "One or more fields contains invalid data", response.message
+  end
+  
   def test_successful_retrieve_request
     @gateway.expects(:ssl_post).returns(successful_retrieve_response)
     response = @gateway.retrieve("2605522582930008402433")
@@ -481,6 +502,22 @@ private
     <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-14315492"><wsu:Created>2009-12-22T16:26:25.861Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:requestID>2614991858240008402433</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:requestToken>AhhBLwSRG4SasH9MrWwDpEkYjNpJlXR6SoJoSAZc</c:requestToken></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def successful_store_using_auth_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-6035221"><wsu:Created>2009-12-27T14:36:53.852Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2619246131100008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahjv7wSRG/qvHb/YcpwCIkGzlszcNnDZqzcSp9q1WTd0ASmlibJP73zy0gBJIwyaSZV0ekqCbAnIjf1WCKpDblwDAAAAaxOo</c:requestToken><c:paySubscriptionCreateReply><c:reasonCode>100</c:reasonCode><c:subscriptionID>2619246131100008402433</c:subscriptionID></c:paySubscriptionCreateReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+  
+  def unsuccessful_store_using_auth_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-6006228"><wsu:Created>2009-12-27T14:35:25.411Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:requestID>2619245248280008402433</c:requestID><c:decision>REJECT</c:decision><c:reasonCode>102</c:reasonCode><c:invalidField>c:paySubscriptionCreateService/c:paymentRequestID</c:invalidField><c:requestToken>AhgBLwSRG/qo1+i/ckwDJIozaSZV0ekqCaAAIS6W</c:requestToken></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
 end

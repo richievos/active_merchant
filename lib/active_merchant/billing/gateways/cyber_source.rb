@@ -208,8 +208,11 @@ module ActiveMerchant #:nodoc:
       # creating a Profile.
       #
       # This call requires:
-      # - a valid CreditCard (storage of invalid cards is not allowed)
-      # - an address be specified in the options hash (as with authorize)
+      # - either
+      #   - a valid CreditCard (storage of invalid cards is not allowed)
+      #   - an address be specified in the options hash (as with authorize)
+      # - or
+      #   - an authorization code
       #
       # This call allows:
       # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD".
@@ -217,9 +220,11 @@ module ActiveMerchant #:nodoc:
       #   be sent to CyberSource for storage along with the rest of the customer Profile information.
       #   Note that each item in the Array will have to_s called on it, so plan for your own
       #   mapping/serialization carefully.
-      def store(credit_card, options = {})
+      # - an :order_id option in the options hash. Default: the current time, represented as an integer.
+      def store(credit_card_or_authorization, options = {})
+        options[:order_id] ||= Time.now.to_i
         setup_address_hash(options)
-        commit(build_store_request(credit_card, options), options)
+        commit(build_store_request(credit_card_or_authorization, options), options)
       end
       
       # Allows for retrieving stored Profile information.
@@ -330,15 +335,30 @@ module ActiveMerchant #:nodoc:
         add_auth_service(xml)
       end
       
-      def build_store_request(credit_card, options)
+      def build_store_request(credit_card_or_authorization, options)
         xml = Builder::XmlMarkup.new :indent => 2
+        
+        if credit_card_or_authorization.is_a?(CreditCard)
+          build_store_request_from_credit_card(xml, credit_card_or_authorization, options)
+        else
+          build_store_request_from_authorization(xml, credit_card_or_authorization, options)
+        end
+        
+        xml.target!
+      end
+      
+      def build_store_request_from_credit_card(xml, credit_card, options)
         add_address(xml, credit_card, options[:billing_address], options)
         add_purchase_data(xml, 0, false)
         add_credit_card(xml, credit_card)
         add_store_information(xml)
         add_custom_information(xml, options[:custom]) unless options[:custom].blank?
         add_create_service(xml)
-        xml.target!
+      end
+      
+      def build_store_request_from_authorization(xml, authorization, options)
+        add_store_information(xml, false)
+        add_create_from_auth_service(xml, authorization)
       end
       
       def build_update_request(identification, options)
@@ -534,9 +554,9 @@ module ActiveMerchant #:nodoc:
         xml.tag! 'ccAuthService', {'run' => 'true'} 
       end
       
-      def add_store_information(xml)
+      def add_store_information(xml, include_amount=true)
         xml.tag! "recurringSubscriptionInfo" do
-          xml.tag! "amount", "0.00"
+          xml.tag! "amount", "0.00" if include_amount
           xml.tag! "frequency", "on-demand"
         end
       end
@@ -559,6 +579,15 @@ module ActiveMerchant #:nodoc:
       
       def add_create_service(xml)
         xml.tag! "paySubscriptionCreateService", { 'run' => 'true' }
+      end
+      
+      def add_create_from_auth_service(xml, authorization)
+        order_id, request_id, request_token = authorization.split(";")
+
+        xml.tag! "paySubscriptionCreateService", { 'run' => 'true' } do
+          xml.tag! "paymentRequestID", request_id
+          xml.tag! "paymentRequestToken", request_token
+        end
       end
       
       def add_update_service(xml)
@@ -617,7 +646,6 @@ module ActiveMerchant #:nodoc:
       # Contact CyberSource, make the SOAP request, and parse the reply into a Response object
       def commit(request, options)
         response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, build_request(request, options)))
-        
         success = response[:decision] == "ACCEPT"
         message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message] 
         authorization = success ? [ options[:order_id], response[:requestID], response[:requestToken] ].compact.join(";") : nil
