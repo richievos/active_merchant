@@ -1,43 +1,80 @@
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
-    
-    # A convenience class that wraps Response and provides some readers for accessing
-    # returned data from CyberSource in a more idiomatic manner.
-    class CyberSourceResponse < Response
-      # The set of custom values stored with the Customer Profile when creating or 
-      # updating a Customer Profile.
-      def custom_values
-        params.values_at('merchantDefinedDataField1', 'merchantDefinedDataField2', 
-          'merchantDefinedDataField3', 'merchantDefinedDataField4').compact
-      end
-      
-      # A returned token from CyberSource that identifies a Customer Profile. Any 
-      # further interactions with the Profile (updating, cancelling, authorizing-with)
-      # must use this token.
-      def token; params["subscriptionID"]; end
-    end
-    
-    # See the remote and mocked unit test files for example usage.  Pay special attention to the contents of the options hash.
+    # == Setup
+    # In order to work with CyberSource, you must have an account. You can {register for an evaluation
+    # account}[https://apps.cybersource.com/cgi-bin/register/reg_form.pl]; this will provide you with
+    # a CyberSource ID (also referred to as a merchantID), as well as a login to the CyberSource 
+    # Business Center.
     #
-    # Initial setup instructions can be found in http://cybersource.com/support_center/implementation/downloads/soap_api/SOAP_toolkits.pdf
+    # This gateway implementation uses CyberSource's SOAP API. In order to use the SOAP API, you must
+    # generate an encrytion key that will be used as your "password" for API requests. The instructions
+    # for generating this key can be found in page 9 of the SOAP Toolkits API document listed under
+    # References.
+    #
+    # You should update the fixtures.yml file to reflect your merchantID and generated encrytion key 
+    # for login and password, respectively.
     # 
-    # Debugging 
-    # If you experience an issue with this gateway be sure to examine the transaction information from a general transaction search inside the CyberSource Business
-    # Center for the full error messages including field names.   
+    # == Usage
+    # Example usage can be found in CyberSourceTest and RemoteCyberSourceTest. This gateway conforms 
+    # to the ActiveMerchant API, and so provides the basic authorize, capture, purchase, void and 
+    # credit functionality.
     #
-    # Important Notes
-    # * AVS and CVV only work against the production server.  You will always get back X for AVS and no response for CVV against the test server. 
-    # * Nexus is the list of states or provinces where you have a physical presence.  Nexus is used to calculate tax.  Leave blank to tax everyone.  
-    # * If you want to calculate VAT for overseas customers you must supply a registration number in the options hash as vat_reg_number. 
-    # * productCode is a value in the line_items hash that is used to tell CyberSource what kind of item you are selling.  It is used when calculating tax/VAT.
+    # This gateway implementation also provides the following additional functionality:
+    #
+    # * the ability to store, update, retrieve and unstore stored customer details (credit card, 
+    #   address, etc.)
+    # * the ability to store customer details from a previous authorization
+    # * the ability to authorize and purchase using stored customer details
+    # * the ability to calculate_tax, given an address and a list of line items
+    # 
+    # CyberSource maintains the notion of Customer Profiles for storing customer details. For more 
+    # information, check out the Secure Data Suite User's and Developer's Guides. Note that this data
+    # storage functionality uses the same underpinnings as CyberSource's recurring billing functionality,
+    # so much of the documentation is intermingled.
+    #
+    # == Debugging
+    # If you experience an issue with this gateway be sure to examine the transaction information 
+    # from a general transaction search inside the CyberSource Business Center for the full error 
+    # messages including field names.
+    # 
+    # == Notes
     # * All transactions use dollar values.
-    # * In order to transact in multiple currencies, the desired currencies must be enabled on your CyberSource account. This can be accomplished by contacting CyberSource support (a link is available from the Business Center).
+    # * AVS and CVV only work against the production server. On the test server, you will always 
+    #   get back an 'X' for AVS and no response for CVV.
+    # * In order to transact in multiple currencies, the desired currencies must be enabled on your
+    #   CyberSource account. This can be accomplished by contacting CyberSource support (a link is 
+    #   available from the CyberSource Business Center).
+    #
+    # = References
+    # * {SOAP Toolkits for CyberSource's Web Services: Developer Guide (PDF)}[http://www.cybersource.com/support_center/implementation/downloads/soap_api/SOAP_toolkits.pdf]
+    # * {CyberSource Business Center (Test)}[https://ebctest.cybersource.com/]
+    # * {CyberSource Business Center (Live)}[https://ebc.cybersource.com/]
+    # * {CyberSource Secure Data Suite: User's Guide}[http://apps.cybersource.com/library/documentation/dev_guides/Secure_Data_Suite_UG/html/]
+    # * {CyberSource Secure Data Suite: Developers's Guide}[http://apps.cybersource.com/library/documentation/dev_guides/Recurring_Billing_IG/html/]
+    # * {List of CyberSource Quick References}[http://www.cybersource.com/support_center/support_documentation/quick_references/]
+    # * {A full list of CyberSource supported currency codes (PDF)}[http://apps.cybersource.com/library/documentation/sbc/quickref/currencies.pdf]
+    # * {CyberSource Credit Card Services: For the Simple Order API}[http://apps.cybersource.com/library/documentation/dev_guides/CC_Svcs_SO_API/html/]
     class CyberSourceGateway < Gateway
+      
+      # A convenience class that wraps ActiveMerchant::Billing::Response and provides some 
+      # readers for accessing returned data from CyberSource in a more idiomatic manner.
+      class Response < ActiveMerchant::Billing::Response
+        # The set of custom values stored with the Customer Profile when creating or 
+        # updating a Customer Profile.
+        def custom_values
+          params.values_at('merchantDefinedDataField1', 'merchantDefinedDataField2', 
+            'merchantDefinedDataField3', 'merchantDefinedDataField4').compact
+        end
+
+        # A returned token from CyberSource that identifies a Customer Profile. Any 
+        # further interactions with the Profile (updating, cancelling, authorizing-with)
+        # must use this token.
+        def token; params["subscriptionID"]; end
+      end
       
       TEST_URL = 'https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor'
       LIVE_URL = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
           
-      # visa, master, american_express, discover
       self.supported_cardtypes = [:visa, :master, :american_express, :discover]
       self.supported_countries = ['US']
       self.default_currency = 'USD'
@@ -104,8 +141,10 @@ module ActiveMerchant #:nodoc:
       #
       # This call allows: 
       # - :test => true   sets the gateway to test mode
-      # - :vat_reg_number => your VAT registration number
-      # - :nexus => "WI CA QC" sets the states/provinces where you have a physical presense for tax purposes
+      # - :vat_reg_number => your VAT registration number. Required if you want to calculate VAT for 
+      #   overseas customers
+      # - :nexus => "WI CA QC" sets the list of states or provinces where you have a physical presence 
+      #   and is used to  calculate tax. Leave this blank to tax everyone.
       # - :ignore_avs => true   don't want to use AVS so continue processing even if AVS would have failed 
       # - :ignore_cvv => true   don't want to use CVV so continue processing even if CVV would have failed 
       def initialize(options = {})
@@ -139,9 +178,7 @@ module ActiveMerchant #:nodoc:
       # - a :persist in the options hash. If set to true, the customer information will be saved,
       #   and a token (available via response.token) will be returned for usage in future 
       #   transactions.
-      # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD". 
-      #   A full list of supported currency codes is available at:
-      #   http://apps.cybersource.com/library/documentation/sbc/quickref/currencies.pdf
+      # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD".
       # - a :custom in the options hash. This can be an Array of up to four items that will
       #   be sent to CyberSource for storage along with the rest of the customer Profile information.
       #   Note that each item in the Array will have to_s called on it, so plan for your own
@@ -292,6 +329,8 @@ module ActiveMerchant #:nodoc:
       #
       # This functionality is only supported by this particular gateway may and be changed at 
       # any time
+      #
+      # Note that the 'code' value is used to tell CyberSource what kind of item you are selling.
       def calculate_tax(credit_card, options)
         requires!(options,  :line_items)
         setup_address_hash(options)
@@ -300,7 +339,8 @@ module ActiveMerchant #:nodoc:
       
     private
     
-      # Create all address hash key value pairs so that we still function if we were only provided with one or two of them 
+      # Create all address hash key value pairs so that we still function if we were only 
+      # provided with one or two of them 
       def setup_address_hash(options)
         options[:billing_address] = options[:billing_address] || options[:address] || {}
         options[:shipping_address] = options[:shipping_address] || {}
@@ -372,8 +412,8 @@ module ActiveMerchant #:nodoc:
       end
       
       def build_retrieve_request(identification, options)
-        # CyberSource requires this (put into the XML as merchantReferenceCode) to be set to *something*, 
-        # although it doesn't care about its contents otherwise.
+        # CyberSource requires this (put into the XML as merchantReferenceCode) to be set to 
+        # *something*, although it doesn't care about its contents otherwise.
         options[:order_id] = Time.now.to_i.to_s
         
         xml = Builder::XmlMarkup.new :indent => 2
@@ -643,14 +683,15 @@ module ActiveMerchant #:nodoc:
         xml.target! 
       end
       
-      # Contact CyberSource, make the SOAP request, and parse the reply into a Response object
+      # Contacts CyberSource, makes the SOAP request, and parses the reply into a 
+      # CyberSourceGateway::Response object
       def commit(request, options)
         response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, build_request(request, options)))
         success = response[:decision] == "ACCEPT"
         message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message] 
         authorization = success ? [ options[:order_id], response[:requestID], response[:requestToken] ].compact.join(";") : nil
 
-        CyberSourceResponse.new(success, message, response, 
+        Response.new(success, message, response, 
           :test => test?, 
           :authorization => authorization,
           :avs_result => { :code => response[:avsCode] },
@@ -658,8 +699,7 @@ module ActiveMerchant #:nodoc:
         )
       end
       
-      # Parse the SOAP response
-      # Technique inspired by the Paypal Gateway
+      # Parses the SOAP response. Technique inspired by the Paypal Gateway.
       def parse(xml)
         reply = {}
         xml = REXML::Document.new(xml)
