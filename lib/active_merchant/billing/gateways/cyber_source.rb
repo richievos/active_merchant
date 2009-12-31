@@ -33,6 +33,13 @@ module ActiveMerchant #:nodoc:
     # so much of the documentation is intermingled.
     #
     # == Debugging
+    # CyberSource has provided a SOAPUI[http://soapui.org/] project that is modestly invaluable for
+    # both development and debugging. After {downloading the project}[http://files.onedesigncompany.com/active-merchant/cybersource-soapui-project.zip], you
+    # should open it up in your text editor of choice and replace "[Your Merchant ID Here]" with
+    # your merchantID and "[Your EBC SOAP Key Here]" with your generated encryption key. Then, you
+    # can import the Project into SOAPUI and see pre-built (and working) SOAP API requests and
+    # responses.
+    #
     # If you experience an issue with this gateway be sure to examine the transaction information 
     # from a general transaction search inside the CyberSource Business Center for the full error 
     # messages including field names.
@@ -54,6 +61,7 @@ module ActiveMerchant #:nodoc:
     # * {List of CyberSource Quick References}[http://www.cybersource.com/support_center/support_documentation/quick_references/]
     # * {A full list of CyberSource supported currency codes (PDF)}[http://apps.cybersource.com/library/documentation/sbc/quickref/currencies.pdf]
     # * {CyberSource Credit Card Services: For the Simple Order API}[http://apps.cybersource.com/library/documentation/dev_guides/CC_Svcs_SO_API/html/]
+    # * {CyberSource SOAPUI Project}[http://files.onedesigncompany.com/active-merchant/cybersource-soapui-project.zip]
     class CyberSourceGateway < Gateway
       
       # A convenience class that wraps ActiveMerchant::Billing::Response and provides some 
