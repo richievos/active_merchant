@@ -138,17 +138,6 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_match /wsse:InvalidSecurity/, exception.response.body
   end
   
-  def test_successful_credit
-    assert response = @gateway.purchase(@amount, @credit_card, @options)
-    assert_equal 'Successful transaction', response.message
-    assert_success response
-    assert response.test?
-    assert response = @gateway.credit(@amount, response.authorization)
-    assert_equal 'Successful transaction', response.message
-    assert_success response
-    assert response.test?       
-  end
-  
   def test_successful_store
     response = @gateway.store(@credit_card, @options)
 
@@ -360,18 +349,38 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     
     assert_equal "One or more fields contains invalid data", response.message
   end
+
+  #
+  # Crediting
+  #
   
-  def test_credit_using_token
+  def test_successful_credit
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_equal 'Successful transaction', response.message
+    assert_success response
+    assert response.test?
+
+    @options[:token] = response.params["requestID"]
+    @options[:created_at] = 1.hour.ago
+    assert response = @gateway.credit(@amount, response.authorization, @options)
+    assert_equal 'Successful transaction', response.message
+    assert_success response
+    assert response.test?
+  end
+  
+  def test_standalone_credit_using_token
     store_response = @gateway.store(@credit_card, @options)
-    
-    response = @gateway.credit(@amount, store_response.token, @options)
+
+    response = @gateway.standalone_credit(@amount, store_response.token, @options)
 
     assert_success response
     assert response.test?
   end
   
   def test_credit_using_token_with_incorrect_token_should_fail
-    response = @gateway.credit(@amount, "fake-token-here", @options)
+    @options[:token] = "blahblahblah"
+    @options[:created_at] = 1.hour.ago
+    response = @gateway.standalone_credit(@amount, "fake-token-here", @options)
     
     assert_failure response
     assert response.test?

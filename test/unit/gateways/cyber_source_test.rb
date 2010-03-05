@@ -11,7 +11,10 @@ class CyberSourceTest < Test::Unit::TestCase
     @credit_card = credit_card('4111111111111111', :type => 'visa')
     @declined_card = credit_card('801111111111111', :type => 'visa')
     
-    @options = { :billing_address => { 
+    @options = {
+               :token => "2611552700460008299530",
+               :created_at => Time.now,
+               :billing_address => { 
                   :address1 => '1234 My Street',
                   :address2 => 'Apt 1',
                   :company => 'Widgets Inc',
@@ -128,16 +131,6 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_equal 'M', response.cvv_result['code']
   end
 
-  def test_successful_credit_request
-    @gateway.stubs(:ssl_post).returns(successful_capture_response, successful_credit_response)
-    assert response = @gateway.purchase(@amount, @credit_card, @options)
-    assert_success response
-    assert response.test?
-    assert response_capture = @gateway.credit(@amount, response.authorization)
-    assert_success response_capture
-    assert response_capture.test?  
-  end
-  
   def test_request_should_not_include_a_business_rules_element_if_neither_ignore_avs_nor_ignore_cvv_are_set
     assert_no_match(/businessRules/, auth_request)
   end
@@ -192,7 +185,7 @@ class CyberSourceTest < Test::Unit::TestCase
     response = @gateway.store('fake-authorization-here', {})
     assert_failure response
     assert response.test?
-    
+
     assert_equal "One or more fields contains invalid data", response.message
   end
   
@@ -305,17 +298,59 @@ class CyberSourceTest < Test::Unit::TestCase
     
     assert_equal "One or more fields contains invalid data", response.message
   end
-  
-  def test_credit_using_token
-    @gateway.expects(:ssl_post).returns(successful_credit_using_token_response)
-    response = @gateway.credit(@amount, "2611552700460008299530", @options)
 
+  #
+  # Crediting
+  #
+  
+  def test_credit_when_missing_token_option
+    @gateway.stubs(:ssl_post)
+    @options.delete(:token)
+    assert_raise(ArgumentError, "Missing required parameter: token") do
+      @gateway.credit(@amount, "123;456;78901234567890", @options)
+    end
+  end
+
+  def test_credit_when_missing_created_at_option
+    @gateway.stubs(:ssl_post)
+    @options.delete(:created_at)
+    assert_raise(ArgumentError, "Missing required parameter: created_at") do
+      @gateway.credit(@amount, "123;456;78901234567890", @options)
+    end
+  end
+
+  def test_successful_credit_request
+    @gateway.stubs(:ssl_post).returns(successful_capture_response, successful_credit_response)
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_success response
+    assert response.test?
+    assert response_capture = @gateway.credit(@amount, response.authorization, @options)
+    assert_success response_capture
+    assert response_capture.test?
+  end
+  
+  def test_standalone_credit_using_token
+    @gateway.expects(:ssl_post).returns(successful_credit_using_token_response)
+    response = @gateway.standalone_credit(@amount, "2611552700460008299530", @options)
+
+    assert_success response
+    assert response.test?
+  end
+  
+  def test_successful_credit_using_authorization_code_but_is_older_than_60_days
+    @options[:token] = "2611552700460008299530"
+    @options[:created_at] = 61.days.ago
+    @gateway.expects(:ssl_post).returns(successful_credit_using_token_response)
+    response = @gateway.credit(@amount, "123;456;78901234567890", @options)
+    
     assert_success response
     assert response.test?
   end
   
   def test_credit_using_token_with_incorrect_token_should_fail
     @gateway.expects(:ssl_post).returns(unsuccessful_credit_using_token_response)
+    @options[:token] = "2611552700460008299530"
+    @options[:created_at] = 1.day.ago
     response = @gateway.credit(@amount, "fake-token-here", @options)
     
     assert_failure response
@@ -496,7 +531,15 @@ private
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-33319815"><wsu:Created>2009-12-22T16:25:43.057Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>2614991427750008402433</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahj/fwSRG4SXoXDFnmQCIkGzlozbtGLSszcS4jSXSTZJ/GMQoCmyT+MYhdIFfRJGQyaSZV0ekqCaUBMAP0J0</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccCreditReply><c:reasonCode>100</c:reasonCode><c:requestDateTime>2009-12-22T16:25:42Z</c:requestDateTime><c:amount>10.00</c:amount><c:reconciliationID>69437414V38KD4KR</c:reconciliationID></c:ccCreditReply></c:replyMessage></soap:Body></soap:Envelope>
     XML
   end
-  
+
+  def successful_credit_using_authorization_response_like_a_token_response
+    <<-XML
+    <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><wsu:Timestamp xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="Timestamp-33319815"><wsu:Created>2009-12-22T16:25:43.057Z</wsu:Created></wsu:Timestamp></wsse:Security></soap:Header><soap:Body><c:replyMessage xmlns:c="urn:schemas-cybersource-com:transaction-data-1.28"><c:merchantReferenceCode>MRC-123456</c:merchantReferenceCode><c:requestID>123;456;78901234567890</c:requestID><c:decision>ACCEPT</c:decision><c:reasonCode>100</c:reasonCode><c:requestToken>Ahj/fwSRG4SXoXDFnmQCIkGzlozbtGLSszcS4jSXSTZJ/GMQoCmyT+MYhdIFfRJGQyaSZV0ekqCaUBMAP0J0</c:requestToken><c:purchaseTotals><c:currency>USD</c:currency></c:purchaseTotals><c:ccCreditReply><c:reasonCode>100</c:reasonCode><c:requestDateTime>2009-12-22T16:25:42Z</c:requestDateTime><c:amount>10.00</c:amount><c:reconciliationID>69437414V38KD4KR</c:reconciliationID></c:ccCreditReply></c:replyMessage></soap:Body></soap:Envelope>
+    XML
+  end
+
   def unsuccessful_credit_using_token_response
     <<-XML
     <?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">

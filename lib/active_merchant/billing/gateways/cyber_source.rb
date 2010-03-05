@@ -35,10 +35,10 @@ module ActiveMerchant #:nodoc:
     # == Debugging
     # CyberSource has provided a SOAPUI[http://soapui.org/] project that is modestly invaluable for
     # both development and debugging. After {downloading the project}[http://files.onedesigncompany.com/active-merchant/cybersource-soapui-project.zip], you
-    # should open it up in your text editor of choice and replace "[Your Merchant ID Here]" with
-    # your merchantID and "[Your EBC SOAP Key Here]" with your generated encryption key. Then, you
-    # can import the Project into SOAPUI and see pre-built (and working) SOAP API requests and
-    # responses.
+    # should open up `CyberSource Web Service SoapUI Project (Template).xml` in your text editor of choice
+    # and replace "[Your Merchant ID Here]" with your merchantID and "[Your EBC SOAP Key Here]" with your 
+    # generated encryption key. Then, you can import the Project into SOAPUI and see pre-built (and working) 
+    # SOAP API requests and responses.
     #
     # If you experience an issue with this gateway be sure to examine the transaction information 
     # from a general transaction search inside the CyberSource Business Center for the full error 
@@ -63,7 +63,8 @@ module ActiveMerchant #:nodoc:
     # * {CyberSource Credit Card Services: For the Simple Order API}[http://apps.cybersource.com/library/documentation/dev_guides/CC_Svcs_SO_API/html/]
     # * {CyberSource SOAPUI Project}[http://files.onedesigncompany.com/active-merchant/cybersource-soapui-project.zip]
     class CyberSourceGateway < Gateway
-      
+      SIXTY_DAYS_AGO = (60 * 86400)
+
       # A convenience class that wraps ActiveMerchant::Billing::Response and provides some 
       # readers for accessing returned data from CyberSource in a more idiomatic manner.
       class Response < ActiveMerchant::Billing::Response
@@ -240,13 +241,25 @@ module ActiveMerchant #:nodoc:
       #
       # This call requires:
       # - an amount of money (as a Money object or positive integer) to credit
-      # - either:
-      #   - an authorization code (e.g. received from the result of an authorize call)
-      #   - a token from CyberSource (retrieved from the store API call)
+      # - an authorization code (e.g. received from the result of an authorize call)
+      # - required:
+      #   - :token => a token from CyberSource (retrieved from the store API call)
+      #   - :created_at => timestamp (used to determine if over the 60 day mark)
       #
       # This call does not allow any options to speak of.
-      def credit(money, identification_or_token, options = {})
-        commit(build_credit_request(money, identification_or_token, options), options)
+      def credit(money, identification, options = {})
+        requires!(options, :token, :created_at)
+        token, created_at = options.delete(:token), options.delete(:created_at)
+        if (Time.now - (created_at || Time.now)) >= SIXTY_DAYS_AGO
+          target = build_standalone_credit_request(money, token, options)
+        else
+          target = build_credit_request(money, identification, options)
+        end
+        commit(target, options)
+      end
+
+      def standalone_credit(money, token, options={})
+        commit(build_standalone_credit_request(money, token, options), options)
       end
       
       # Allows for storing credit card information. In CyberSource, this is done behind the scenes by 
@@ -499,15 +512,15 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
 
-      def build_credit_request(money, identification_or_token, options)
+      def build_credit_request(money, identification, options)
         xml = Builder::XmlMarkup.new :indent => 2
+        build_credit_request_from_authorization(xml, money, identification, options)
+        xml.target!
+      end
 
-        if identification_or_token =~ /.+;.+;.+/
-          build_credit_request_from_authorization(xml, money, identification_or_token, options)
-        else
-          build_credit_request_from_profile(xml, money, identification_or_token)
-        end
-        
+      def build_standalone_credit_request(money, token, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        build_credit_request_from_profile(xml, money, token)
         xml.target!
       end
       

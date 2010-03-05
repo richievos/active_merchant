@@ -33,8 +33,8 @@ card_stream:
   password: Y
   
 cyber_source:
-  login: "merchant id"
-  password: "generated encryption key"
+  login: danhodos
+  password: "k5PdUfq5GTlthOe8lXdXSnbyOQgyrGh+QyCX/yqaH6dInMjbmNjnMsqd8QwAdU9lSUiZbCIccxtYmLaSjBj1xKd/WSohwKfFpirtUtyGE3AtUeT5yC7jwtmmRaDiDal70BlmG5rk0j6VW9Tc0qYGtGNJyOdGoHcHmZKtySMM4Vsy4aXc6PWdmYE7LCLWkjzJ1PDDCDKsaH5DIJf/Kpofp0icyNuY2Ocyyp3xDAB1T2VJSJlsIhxzG1iYtpKMGPXEp39ZKiHAp8WmKu1S3IYTcC1R5PnILuPC2aZFoOINqXvQGWYbmuTSPpVb1NzSpga0Y0nI50agdweZkq3JIwzhWw=="
     
 data_cash:
   login: X
