@@ -280,7 +280,7 @@ module ActiveMerchant #:nodoc:
       #   mapping/serialization carefully.
       # - an :order_id option in the options hash. Default: the current time, represented as an integer.
       def store(credit_card_or_authorization, options = {})
-        options[:order_id] ||= Time.now.to_i
+        options[:order_id] ||= default_order_id
         setup_address_hash(options)
         commit(build_store_request(credit_card_or_authorization, options), options)
       end
@@ -435,7 +435,7 @@ module ActiveMerchant #:nodoc:
       def build_retrieve_request(identification, options)
         # CyberSource requires this (put into the XML as merchantReferenceCode) to be set to
         # *something*, although it doesn't care about its contents otherwise.
-        options[:order_id] = Time.now.to_i.to_s
+        options[:order_id] = default_order_id
 
         xml = Builder::XmlMarkup.new :indent => 2
         add_recurring_subscription_info(xml, identification)
@@ -445,7 +445,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def build_unstore_request(identification, options)
-        options[:order_id] = Time.now.to_i.to_s
+        options[:order_id] = default_order_id
 
         xml = Builder::XmlMarkup.new :indent => 2
         add_update_information(xml, identification, true)
@@ -525,7 +525,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def build_credit_request_from_profile(xml, money, token)
-        add_purchase_data(xml, money, true, { :order_id => Time.now.to_i })
+        add_purchase_data(xml, money, true, { :order_id => default_order_id })
         add_recurring_subscription_info(xml, token)
         add_credit_service(xml, nil, nil)
       end
