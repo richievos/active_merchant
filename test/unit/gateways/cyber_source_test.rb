@@ -98,19 +98,23 @@ class CyberSourceTest < Test::Unit::TestCase
   end
 
   def test_requires_error_on_purchase_without_order_id  
-    assert_raise(ArgumentError){ @gateway.purchase(@amount, @credit_card, @options.delete_if{|key, val| key == :order_id}) }
+    @options.delete(:order_id)
+    assert_raise(ArgumentError){ @gateway.purchase(@amount, @credit_card, @options) }
   end
 
   def test_requires_error_on_authorization_without_order_id
-    assert_raise(ArgumentError){ @gateway.purchase(@amount, @credit_card, @options.delete_if{|key, val| key == :order_id}) }
+    @options.delete(:order_id)
+    assert_raise(ArgumentError){ @gateway.authorize(@amount, @credit_card, @options) }
   end
 
   def test_requires_error_on_authorization_without_email
-    assert_raise(ArgumentError){ @gateway.purchase(@amount, @credit_card, @options.delete_if{|key, val| key == :email}) }
+    @options.delete(:email)
+    assert_raise(ArgumentError){ @gateway.authorize(@amount, @credit_card, @options) }
   end
 
   def test_requires_error_on_tax_calculation_without_line_items
-    assert_raise(ArgumentError){ @gateway.calculate_tax(@credit_card, @options.delete_if{|key, val| key == :line_items})}
+    @options.delete(:line_items)
+    assert_raise(ArgumentError){ @gateway.calculate_tax(@credit_card, @options) }
   end
 
   def test_default_currency
@@ -358,7 +362,23 @@ class CyberSourceTest < Test::Unit::TestCase
     
     assert_equal "One or more fields contains invalid data", response.message
   end
-  
+
+  def test_credit_builds_merchant_reference_code_from_identification
+    @options.delete(:order_id)
+    @gateway.expects(:ssl_post).with() do |url, xml|
+      xml =~ /<merchantReferenceCode>xyz<\/merchantReferenceCode>/
+    end.returns(successful_credit_response)
+    assert response = @gateway.credit(@amount, "xyz;123;def", @options)
+  end
+
+  def test_standalone_credit_adds_default_merchant_reference_code_when_order_id_is_missing
+    @options.delete(:order_id)
+    @gateway.expects(:ssl_post).with() do |url, xml|
+      xml =~ /<merchantReferenceCode>\d+<\/merchantReferenceCode>/
+    end.returns(successful_credit_response)
+    assert response = @gateway.standalone_credit(@amount, "abc123zyx", @options)
+  end
+
 private
 
   def auth_request

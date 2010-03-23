@@ -3,7 +3,7 @@ module ActiveMerchant #:nodoc:
     # == Setup
     # In order to work with CyberSource, you must have an account. You can {register for an evaluation
     # account}[https://apps.cybersource.com/cgi-bin/register/reg_form.pl]; this will provide you with
-    # a CyberSource ID (also referred to as a merchantID), as well as a login to the CyberSource 
+    # a CyberSource ID (also referred to as a merchantID), as well as a login to the CyberSource
     # Business Center.
     #
     # This gateway implementation uses CyberSource's SOAP API. In order to use the SOAP API, you must
@@ -11,23 +11,23 @@ module ActiveMerchant #:nodoc:
     # for generating this key can be found in page 9 of the SOAP Toolkits API document listed under
     # References.
     #
-    # You should update the fixtures.yml file to reflect your merchantID and generated encrytion key 
+    # You should update the fixtures.yml file to reflect your merchantID and generated encrytion key
     # for login and password, respectively.
-    # 
+    #
     # == Usage
-    # Example usage can be found in CyberSourceTest and RemoteCyberSourceTest. This gateway conforms 
-    # to the ActiveMerchant API, and so provides the basic authorize, capture, purchase, void and 
+    # Example usage can be found in CyberSourceTest and RemoteCyberSourceTest. This gateway conforms
+    # to the ActiveMerchant API, and so provides the basic authorize, capture, purchase, void and
     # credit functionality.
     #
     # This gateway implementation also provides the following additional functionality:
     #
-    # * the ability to store, update, retrieve and unstore stored customer details (credit card, 
+    # * the ability to store, update, retrieve and unstore stored customer details (credit card,
     #   address, etc.)
     # * the ability to store customer details from a previous authorization
     # * the ability to authorize and purchase using stored customer details
     # * the ability to calculate_tax, given an address and a list of line items
-    # 
-    # CyberSource maintains the notion of Customer Profiles for storing customer details. For more 
+    #
+    # CyberSource maintains the notion of Customer Profiles for storing customer details. For more
     # information, check out the Secure Data Suite User's and Developer's Guides. Note that this data
     # storage functionality uses the same underpinnings as CyberSource's recurring billing functionality,
     # so much of the documentation is intermingled.
@@ -36,20 +36,20 @@ module ActiveMerchant #:nodoc:
     # CyberSource has provided a SOAPUI[http://soapui.org/] project that is modestly invaluable for
     # both development and debugging. After {downloading the project}[http://files.onedesigncompany.com/active-merchant/cybersource-soapui-project.zip], you
     # should open up `CyberSource Web Service SoapUI Project (Template).xml` in your text editor of choice
-    # and replace "[Your Merchant ID Here]" with your merchantID and "[Your EBC SOAP Key Here]" with your 
-    # generated encryption key. Then, you can import the Project into SOAPUI and see pre-built (and working) 
+    # and replace "[Your Merchant ID Here]" with your merchantID and "[Your EBC SOAP Key Here]" with your
+    # generated encryption key. Then, you can import the Project into SOAPUI and see pre-built (and working)
     # SOAP API requests and responses.
     #
-    # If you experience an issue with this gateway be sure to examine the transaction information 
-    # from a general transaction search inside the CyberSource Business Center for the full error 
+    # If you experience an issue with this gateway be sure to examine the transaction information
+    # from a general transaction search inside the CyberSource Business Center for the full error
     # messages including field names.
-    # 
+    #
     # == Notes
     # * All transactions use dollar values.
-    # * AVS and CVV only work against the production server. On the test server, you will always 
+    # * AVS and CVV only work against the production server. On the test server, you will always
     #   get back an 'X' for AVS and no response for CVV.
     # * In order to transact in multiple currencies, the desired currencies must be enabled on your
-    #   CyberSource account. This can be accomplished by contacting CyberSource support (a link is 
+    #   CyberSource account. This can be accomplished by contacting CyberSource support (a link is
     #   available from the CyberSource Business Center).
     #
     # = References
@@ -65,31 +65,31 @@ module ActiveMerchant #:nodoc:
     class CyberSourceGateway < Gateway
       SIXTY_DAYS_AGO = (60 * 86400)
 
-      # A convenience class that wraps ActiveMerchant::Billing::Response and provides some 
+      # A convenience class that wraps ActiveMerchant::Billing::Response and provides some
       # readers for accessing returned data from CyberSource in a more idiomatic manner.
       class Response < ActiveMerchant::Billing::Response
-        # The set of custom values stored with the Customer Profile when creating or 
+        # The set of custom values stored with the Customer Profile when creating or
         # updating a Customer Profile.
         def custom_values
-          params.values_at('merchantDefinedDataField1', 'merchantDefinedDataField2', 
+          params.values_at('merchantDefinedDataField1', 'merchantDefinedDataField2',
             'merchantDefinedDataField3', 'merchantDefinedDataField4').compact
         end
 
-        # A returned token from CyberSource that identifies a Customer Profile. Any 
+        # A returned token from CyberSource that identifies a Customer Profile. Any
         # further interactions with the Profile (updating, cancelling, authorizing-with)
         # must use this token.
         def token; params["subscriptionID"]; end
       end
-      
+
       TEST_URL = 'https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor'
       LIVE_URL = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
-          
+
       self.supported_cardtypes = [:visa, :master, :american_express, :discover]
       self.supported_countries = ['US']
       self.default_currency = 'USD'
       self.homepage_url = 'http://www.cybersource.com'
       self.display_name = 'CyberSource'
-  
+
       # map CreditCard to the CyberSource expected representation
       cattr_accessor :credit_card_codes
       @@credit_card_codes = {
@@ -109,17 +109,17 @@ module ActiveMerchant #:nodoc:
         :r152 => "The request was received, but a service timed out",
         :r200 => "The authorization request was approved by the issuing bank but declined by CyberSource because it did not pass the AVS check",
         :r201 => "The issuing bank has questions about the request",
-        :r202 => "Expired card", 
-        :r203 => "General decline of the card", 
-        :r204 => "Insufficient funds in the account", 
-        :r205 => "Stolen or lost card", 
-        :r207 => "Issuing bank unavailable", 
-        :r208 => "Inactive card or card not authorized for card-not-present transactions", 
-        :r209 => "American Express Card Identifiction Digits (CID) did not match", 
-        :r210 => "The card has reached the credit limit", 
-        :r211 => "Invalid card verification number", 
-        :r221 => "The customer matched an entry on the processor's negative file", 
-        :r230 => "The authorization request was approved by the issuing bank but declined by CyberSource because it did not pass the card verification check", 
+        :r202 => "Expired card",
+        :r203 => "General decline of the card",
+        :r204 => "Insufficient funds in the account",
+        :r205 => "Stolen or lost card",
+        :r207 => "Issuing bank unavailable",
+        :r208 => "Inactive card or card not authorized for card-not-present transactions",
+        :r209 => "American Express Card Identifiction Digits (CID) did not match",
+        :r210 => "The card has reached the credit limit",
+        :r211 => "Invalid card verification number",
+        :r221 => "The customer matched an entry on the processor's negative file",
+        :r230 => "The authorization request was approved by the issuing bank but declined by CyberSource because it did not pass the card verification check",
         :r231 => "Invalid account number",
         :r232 => "The card type is not accepted by the payment processor",
         :r233 => "General decline by the processor",
@@ -138,54 +138,54 @@ module ActiveMerchant #:nodoc:
         :r247 => "You requested a credit for a capture that was previously voided",
         :r250 => "The request was received, but a time-out occurred with the payment processor",
         :r254 => "Your CyberSource account is prohibited from processing stand-alone refunds",
-        :r255 => "Your CyberSource account is not configured to process the service in the country you specified" 
+        :r255 => "Your CyberSource account is not configured to process the service in the country you specified"
       }
 
       # Creates a new CyberSourceGateway object.
       #
       # This call requires:
-      # 
-      # - :login =>  your username 
+      #
+      # - :login =>  your username
       # - :password =>  the transaction key you generated in the Business Center
       #
-      # This call allows: 
+      # This call allows:
       # - :test => true   sets the gateway to test mode
-      # - :vat_reg_number => your VAT registration number. Required if you want to calculate VAT for 
+      # - :vat_reg_number => your VAT registration number. Required if you want to calculate VAT for
       #   overseas customers
-      # - :nexus => "WI CA QC" sets the list of states or provinces where you have a physical presence 
+      # - :nexus => "WI CA QC" sets the list of states or provinces where you have a physical presence
       #   and is used to  calculate tax. Leave this blank to tax everyone.
-      # - :ignore_avs => true   don't want to use AVS so continue processing even if AVS would have failed 
-      # - :ignore_cvv => true   don't want to use CVV so continue processing even if CVV would have failed 
+      # - :ignore_avs => true   don't want to use AVS so continue processing even if AVS would have failed
+      # - :ignore_cvv => true   don't want to use CVV so continue processing even if CVV would have failed
       def initialize(options = {})
         requires!(options, :login, :password)
         @options = options
         super
-      end  
+      end
 
       # Returns true if transactions will run against CyberSource's test gateway. Note that if this option
       # is specified, it will override the setting of Base.gateway_mode.
       def test?
         @options[:test] || Base.gateway_mode == :test
       end
-      
+
       # Allows for authorizing a payment against a credit_card.
       #
       # This call requires:
       # - an amount of money (as a Money object or positive integer)
       # - either
-      #   - a valid credit_card object 
+      #   - a valid credit_card object
       #   - an options hash containing at least:
       #     - a :billing_address
       #     - an :order_id
       #     - a valid :email address
       # - or
-      #   - a token from CyberSource (retrieved from the store API call) that is linked to a 
+      #   - a token from CyberSource (retrieved from the store API call) that is linked to a
       #     valid CreditCard
       #   - an options hash containing at least an :order_id key
       #
       # This call allows:
       # - a :persist in the options hash. If set to true, the customer information will be saved,
-      #   and a token (available via response.token) will be returned for usage in future 
+      #   and a token (available via response.token) will be returned for usage in future
       #   transactions.
       # - a :currency in the options hash (3-letter currency code, per ISO 4217). Default: "USD".
       # - a :custom in the options hash. This can be an Array of up to four items that will
@@ -193,7 +193,7 @@ module ActiveMerchant #:nodoc:
       #   Note that each item in the Array will have to_s called on it, so plan for your own
       #   mapping/serialization carefully.
       def authorize(money, credit_card_or_token, options = {})
-         # :order_id is always required. :email is only required if using a credit card, so we check 
+         # :order_id is always required. :email is only required if using a credit card, so we check
          # it in build_auth_request instead of here.
         requires!(options, :order_id)
         setup_address_hash(options)
@@ -201,7 +201,7 @@ module ActiveMerchant #:nodoc:
       end
 
       # Allows for capturing an authorization.
-      # 
+      #
       # This call requires:
       # - an amount of money equal to or less than the amount of the authorization
       # - an authorization code (e.g. received from the result of an authorize call)
@@ -216,13 +216,13 @@ module ActiveMerchant #:nodoc:
       #
       # This call has the same requirements and options as authorize.
       def purchase(money, credit_card_or_token, options = {})
-        # :order_id is always required. :email is only required if using a credit card, so we check 
+        # :order_id is always required. :email is only required if using a credit card, so we check
         # it in build_purchase_request instead of here.
         requires!(options, :order_id)
         setup_address_hash(options)
         commit(build_purchase_request(money, credit_card_or_token, options), options)
       end
-      
+
       # Allows for a void of a previous transaction.
       #
       # This call requires:
@@ -231,7 +231,7 @@ module ActiveMerchant #:nodoc:
       # This call does not allow any options to speak of.
       #-----
       # Note: in test mode, it appears that this request always fails with error code 246:
-      # "The capture or credit is not voidable because the capture or credit information 
+      # "The capture or credit is not voidable because the capture or credit information
       # has already been submitted to your processor"
       def void(identification, options = {})
         commit(build_void_request(identification, options), options)
@@ -261,8 +261,8 @@ module ActiveMerchant #:nodoc:
       def standalone_credit(money, token, options={})
         commit(build_standalone_credit_request(money, token, options), options)
       end
-      
-      # Allows for storing credit card information. In CyberSource, this is done behind the scenes by 
+
+      # Allows for storing credit card information. In CyberSource, this is done behind the scenes by
       # creating a Profile.
       #
       # This call requires:
@@ -284,7 +284,7 @@ module ActiveMerchant #:nodoc:
         setup_address_hash(options)
         commit(build_store_request(credit_card_or_authorization, options), options)
       end
-      
+
       # Allows for retrieving stored Profile information.
       #
       # This call requires:
@@ -294,23 +294,23 @@ module ActiveMerchant #:nodoc:
       def retrieve(identification, options={})
         commit(build_retrieve_request(identification, options), options)
       end
-      
+
       # Allows for updating stored Profile information.
       #
       # This call requires:
       # - a token from CyberSource (retrieved when using store to create a Profile).
       #
       # This call allows:
-      # - a valid CreditCard object be specified in the options hash (as with the first 
+      # - a valid CreditCard object be specified in the options hash (as with the first
       #   parameter to store) as :credit_card
       # - an address be specified in the options hash (as with authorize)
       def update(identification, options={})
         commit(build_update_request(identification, options), options)
       end
-      
-      # Allows for removing stored Profile information. In CyberSource, there's no *real* way 
+
+      # Allows for removing stored Profile information. In CyberSource, there's no *real* way
       # to remove Profile information. Instead, we actually just cancel the Profile, which
-      # means we are no longer able to authorize against it. Since Profiles are PCI compliant, 
+      # means we are no longer able to authorize against it. Since Profiles are PCI compliant,
       # the only information about customers that will still be readily available are name and
       # address (credit card numbers are masked).
       #
@@ -323,11 +323,11 @@ module ActiveMerchant #:nodoc:
       end
 
       # Allows for calculating of tax based on line-item detail.
-      # 
+      #
       # This call requires:
       # - a valid CreditCard
       # - a :line_items option in the option hash that should look like the following:
-      # 
+      #
       #         :line_items => [
       #           {
       #             :declared_value => '1',
@@ -344,11 +344,11 @@ module ActiveMerchant #:nodoc:
       #             :sku => 'FAKE1232132113123'
       #           }
       #         ]
-      # 
-      # If you do not have prices for each item or want to simplify the situation then pass in 
+      #
+      # If you do not have prices for each item or want to simplify the situation then pass in
       # one fake line item that costs the subtotal of the order.
       #
-      # This functionality is only supported by this particular gateway may and be changed at 
+      # This functionality is only supported by this particular gateway may and be changed at
       # any time
       #
       # Note that the 'code' value is used to tell CyberSource what kind of item you are selling.
@@ -357,19 +357,19 @@ module ActiveMerchant #:nodoc:
         setup_address_hash(options)
         commit(build_tax_calculation_request(credit_card, options), options)
       end
-      
+
     private
-    
-      # Create all address hash key value pairs so that we still function if we were only 
-      # provided with one or two of them 
+
+      # Create all address hash key value pairs so that we still function if we were only
+      # provided with one or two of them
       def setup_address_hash(options)
         options[:billing_address] = options[:billing_address] || options[:address] || {}
         options[:shipping_address] = options[:shipping_address] || {}
       end
-      
+
       def build_auth_request(money, credit_card_or_token, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        
+
         if credit_card_or_token.respond_to?(:display_number)
           requires!(options, :email)
           build_auth_request_from_credit_card(xml, money, credit_card_or_token, options)
@@ -379,7 +379,7 @@ module ActiveMerchant #:nodoc:
 
         xml.target!
       end
-      
+
       def build_auth_request_from_credit_card(xml, money, credit_card, options)
         add_address(xml, credit_card, options[:billing_address], options)
         add_purchase_data(xml, money, true, options)
@@ -389,25 +389,25 @@ module ActiveMerchant #:nodoc:
         add_business_rules_data(xml)
         add_create_service(xml) if options[:persist]
       end
-      
+
       def build_auth_request_from_profile(xml, money, token, options)
         add_purchase_data(xml, money, true, options)
         add_recurring_subscription_info(xml, token)
         add_auth_service(xml)
       end
-      
+
       def build_store_request(credit_card_or_authorization, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        
+
         if credit_card_or_authorization.is_a?(CreditCard)
           build_store_request_from_credit_card(xml, credit_card_or_authorization, options)
         else
           build_store_request_from_authorization(xml, credit_card_or_authorization, options)
         end
-        
+
         xml.target!
       end
-      
+
       def build_store_request_from_credit_card(xml, credit_card, options)
         add_address(xml, credit_card, options[:billing_address], options)
         add_purchase_data(xml, 0, false)
@@ -416,12 +416,12 @@ module ActiveMerchant #:nodoc:
         add_custom_information(xml, options[:custom]) unless options[:custom].blank?
         add_create_service(xml)
       end
-      
+
       def build_store_request_from_authorization(xml, authorization, options)
         add_store_information(xml, false)
         add_create_from_auth_service(xml, authorization)
       end
-      
+
       def build_update_request(identification, options)
         xml = Builder::XmlMarkup.new :indent => 2
         add_address(xml, options[:credit_card], options[:billing_address], options) if options[:billing_address]
@@ -431,22 +431,22 @@ module ActiveMerchant #:nodoc:
         add_update_service(xml)
         xml.target!
       end
-      
+
       def build_retrieve_request(identification, options)
-        # CyberSource requires this (put into the XML as merchantReferenceCode) to be set to 
+        # CyberSource requires this (put into the XML as merchantReferenceCode) to be set to
         # *something*, although it doesn't care about its contents otherwise.
         options[:order_id] = Time.now.to_i.to_s
-        
+
         xml = Builder::XmlMarkup.new :indent => 2
         add_recurring_subscription_info(xml, identification)
         xml.tag! "paySubscriptionRetrieveService", { 'run' => 'true' }
-        
+
         xml.target!
       end
-      
+
       def build_unstore_request(identification, options)
         options[:order_id] = Time.now.to_i.to_s
-        
+
         xml = Builder::XmlMarkup.new :indent => 2
         add_update_information(xml, identification, true)
         add_update_service(xml)
@@ -463,7 +463,7 @@ module ActiveMerchant #:nodoc:
         add_business_rules_data(xml)
         xml.target!
       end
- 
+
       def build_capture_request(money, authorization, options)
         order_id, request_id, request_token = authorization.split(";")
         options[:order_id] = order_id
@@ -473,11 +473,11 @@ module ActiveMerchant #:nodoc:
         add_capture_service(xml, request_id, request_token)
         add_business_rules_data(xml)
         xml.target!
-      end 
+      end
 
       def build_purchase_request(money, credit_card_or_token, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        
+
         if credit_card_or_token.respond_to?(:display_number)
           requires!(options, :email)
           build_purchase_request_from_credit_card(xml, money, credit_card_or_token, options)
@@ -486,7 +486,7 @@ module ActiveMerchant #:nodoc:
         end
         xml.target!
       end
-      
+
       def build_purchase_request_from_credit_card(xml, money, credit_card, options)
         add_address(xml, credit_card, options[:billing_address], options)
         add_purchase_data(xml, money, true, options)
@@ -496,17 +496,17 @@ module ActiveMerchant #:nodoc:
         add_business_rules_data(xml)
         add_create_service(xml) if options[:persist]
       end
-      
+
       def build_purchase_request_from_profile(xml, money, token, options)
         add_purchase_data(xml, money, true, options)
         add_recurring_subscription_info(xml, token)
         add_purchase_service(xml)
       end
-      
+
       def build_void_request(identification, options)
         order_id, request_id, request_token = identification.split(";")
         options[:order_id] = order_id
-        
+
         xml = Builder::XmlMarkup.new :indent => 2
         add_void_service(xml, request_id, request_token)
         xml.target!
@@ -523,13 +523,13 @@ module ActiveMerchant #:nodoc:
         build_credit_request_from_profile(xml, money, token)
         xml.target!
       end
-      
+
       def build_credit_request_from_profile(xml, money, token)
         add_purchase_data(xml, money, true, { :order_id => Time.now.to_i })
         add_recurring_subscription_info(xml, token)
         add_credit_service(xml, nil, nil)
       end
-      
+
       def build_credit_request_from_authorization(xml, money, identification, options)
         order_id, request_id, request_token = identification.split(";")
         options[:order_id] = order_id
@@ -540,17 +540,17 @@ module ActiveMerchant #:nodoc:
 
       def add_business_rules_data(xml)
         return xml unless @options[:ignore_avs] || @options[:ignore_cvv]
-        
+
         xml.tag! 'businessRules' do
           xml.tag!('ignoreAVSResult', 'true') if @options[:ignore_avs]
           xml.tag!('ignoreCVResult', 'true') if @options[:ignore_cvv]
-        end 
+        end
       end
-      
+
       def add_line_item_data(xml, options)
         options[:line_items].each_with_index do |value, index|
           xml.tag! 'item', {'id' => index} do
-            xml.tag! 'unitPrice', amount(value[:declared_value])  
+            xml.tag! 'unitPrice', amount(value[:declared_value])
             xml.tag! 'quantity', value[:quantity]
             xml.tag! 'productCode', value[:code] || 'shipping_only'
             xml.tag! 'productName', value[:description]
@@ -558,15 +558,15 @@ module ActiveMerchant #:nodoc:
           end
         end
       end
-      
+
       def add_merchant_data(xml, options)
         xml.tag! 'merchantID', @options[:login]
-        xml.tag! 'merchantReferenceCode', options[:order_id]
+        xml.tag! 'merchantReferenceCode', options[:order_id] || default_order_id
         xml.tag! 'clientLibrary' ,'Ruby Active Merchant'
         xml.tag! 'clientLibraryVersion',  '1.0'
         xml.tag! 'clientEnvironment' , 'Linux'
       end
-      
+
       def add_recurring_subscription_info(xml, identification)
         xml.tag! "recurringSubscriptionInfo" do
           xml.tag! "subscriptionID", identification
@@ -580,7 +580,7 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_address(xml, credit_card, address, options, shipTo = false)      
+      def add_address(xml, credit_card, address, options, shipTo = false)
         xml.tag! shipTo ? 'shipTo' : 'billTo' do
           xml.tag! 'firstName', credit_card.first_name if credit_card
           xml.tag! 'lastName', credit_card.last_name if credit_card
@@ -591,10 +591,10 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'postalCode', address[:zip]
           xml.tag! 'country', address[:country]
           xml.tag! 'email', options[:email]
-        end 
+        end
       end
 
-      def add_credit_card(xml, credit_card)      
+      def add_credit_card(xml, credit_card)
         xml.tag! 'card' do
           xml.tag! 'accountNumber', credit_card.number
           xml.tag! 'expirationMonth', format(credit_card.month, :two_digits)
@@ -612,16 +612,16 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_auth_service(xml)
-        xml.tag! 'ccAuthService', {'run' => 'true'} 
+        xml.tag! 'ccAuthService', {'run' => 'true'}
       end
-      
+
       def add_store_information(xml, include_amount=true)
         xml.tag! "recurringSubscriptionInfo" do
           xml.tag! "amount", "0.00" if include_amount
           xml.tag! "frequency", "on-demand"
         end
       end
-      
+
       def add_update_information(xml, identification, should_cancel=false)
         xml.tag! "recurringSubscriptionInfo" do
           xml.tag! "subscriptionID", identification
@@ -629,7 +629,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! "amount", "0.00"
         end
       end
-      
+
       def add_custom_information(xml, custom_data)
         xml.tag! "merchantDefinedData" do
           custom_data.first(4).each_with_index do |item, idx|
@@ -637,11 +637,11 @@ module ActiveMerchant #:nodoc:
           end
         end
       end
-      
+
       def add_create_service(xml)
         xml.tag! "paySubscriptionCreateService", { 'run' => 'true' }
       end
-      
+
       def add_create_from_auth_service(xml, authorization)
         order_id, request_id, request_token = authorization.split(";")
 
@@ -650,7 +650,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! "paymentRequestToken", request_token
         end
       end
-      
+
       def add_update_service(xml)
         xml.tag! "paySubscriptionUpdateService", { 'run' => 'true' }
       end
@@ -666,7 +666,7 @@ module ActiveMerchant #:nodoc:
         xml.tag! 'ccAuthService', {'run' => 'true'}
         xml.tag! 'ccCaptureService', {'run' => 'true'}
       end
-      
+
       def add_void_service(xml, request_id, request_token)
         xml.tag! 'voidService', {'run' => 'true'} do
           xml.tag! 'voidRequestID', request_id
@@ -680,7 +680,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'captureRequestToken', request_token if request_token
         end
       end
-      
+
       # Where we actually build the full SOAP request using builder
       def build_request(body, options)
         xml = Builder::XmlMarkup.new :indent => 2
@@ -701,25 +701,25 @@ module ActiveMerchant #:nodoc:
               end
             end
           end
-        xml.target! 
+        xml.target!
       end
-      
-      # Contacts CyberSource, makes the SOAP request, and parses the reply into a 
+
+      # Contacts CyberSource, makes the SOAP request, and parses the reply into a
       # CyberSourceGateway::Response object
       def commit(request, options)
         response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, build_request(request, options)))
         success = response[:decision] == "ACCEPT"
-        message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message] 
+        message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message]
         authorization = success ? [ options[:order_id], response[:requestID], response[:requestToken] ].compact.join(";") : nil
 
-        Response.new(success, message, response, 
-          :test => test?, 
+        Response.new(success, message, response,
+          :test => test?,
           :authorization => authorization,
           :avs_result => { :code => response[:avsCode] },
           :cvv_result => response[:cvCode]
         )
       end
-      
+
       # Parses the SOAP response. Technique inspired by the Paypal Gateway.
       def parse(xml)
         reply = {}
@@ -733,12 +733,12 @@ module ActiveMerchant #:nodoc:
               parse_element(reply, node)
             end
           end
-        elsif root = REXML::XPath.first(xml, "//soap:Fault") 
+        elsif root = REXML::XPath.first(xml, "//soap:Fault")
           parse_element(reply, root)
           reply[:message] = "#{reply[:faultcode]}: #{reply[:faultstring]}"
         end
         return reply
-      end     
+      end
 
       def parse_element(reply, node)
         if node.has_elements?
@@ -747,12 +747,16 @@ module ActiveMerchant #:nodoc:
           if node.parent.name =~ /item/
             parent = node.parent.name + (node.parent.attributes["id"] ? "_" + node.parent.attributes["id"] : '')
             reply[(parent + '_' + node.name).to_sym] = node.text
-          else  
+          else
             reply[node.name.to_sym] = node.text
           end
         end
         return reply
       end
-    end 
-  end 
-end 
+
+      def default_order_id
+        Time.now.to_i
+      end
+    end # CyberSourceGateway
+  end   # Billing
+end     # ActiveMerchant
