@@ -386,8 +386,8 @@ module ActiveMerchant #:nodoc:
         add_credit_card(xml, credit_card)
         add_store_information(xml) if options[:persist]
         add_auth_service(xml)
-        add_business_rules_data(xml)
         add_create_service(xml) if options[:persist]
+        add_business_rules_data(xml)
       end
 
       def build_auth_request_from_profile(xml, money, token, options)
@@ -405,6 +405,7 @@ module ActiveMerchant #:nodoc:
           build_store_request_from_authorization(xml, credit_card_or_authorization, options)
         end
 
+        add_business_rules_data(xml)
         xml.target!
       end
 
@@ -493,14 +494,15 @@ module ActiveMerchant #:nodoc:
         add_credit_card(xml, credit_card)
         add_store_information(xml) if options[:persist]
         add_purchase_service(xml)
-        add_business_rules_data(xml)
         add_create_service(xml) if options[:persist]
+        add_business_rules_data(xml)
       end
 
       def build_purchase_request_from_profile(xml, money, token, options)
         add_purchase_data(xml, money, true, options)
         add_recurring_subscription_info(xml, token)
         add_purchase_service(xml)
+        add_business_rules_data(xml)
       end
 
       def build_void_request(identification, options)
@@ -574,8 +576,10 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_purchase_data(xml, money = 0, include_grand_total = false, options={})
+        currency_to_send = options[:currency].blank? ? currency(money) : options[:currency]
+        
         xml.tag! 'purchaseTotals' do
-          xml.tag! 'currency', options[:currency] || currency(money)
+          xml.tag! 'currency', currency_to_send
           xml.tag!('grandTotalAmount', amount(money))  if include_grand_total
         end
       end
