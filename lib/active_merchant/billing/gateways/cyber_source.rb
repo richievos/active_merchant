@@ -305,6 +305,7 @@ module ActiveMerchant #:nodoc:
       #   parameter to store) as :credit_card
       # - an address be specified in the options hash (as with authorize)
       def update(identification, options={})
+        setup_address_hash(options)
         commit(build_update_request(identification, options), options)
       end
 
@@ -426,7 +427,7 @@ module ActiveMerchant #:nodoc:
       def build_update_request(identification, options)
         xml = Builder::XmlMarkup.new :indent => 2
         add_address(xml, options[:credit_card], options[:billing_address], options) if options[:billing_address]
-        add_credit_card(xml, options[:credit_card]) if options[:credit_card]
+        add_credit_card(xml, options[:credit_card], false) if options[:credit_card]
         add_update_information(xml, identification)
         add_custom_information(xml, options[:custom]) unless options[:custom].blank?
         add_update_service(xml)
@@ -598,9 +599,9 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_credit_card(xml, credit_card)
+      def add_credit_card(xml, credit_card, include_account_number=true)
         xml.tag! 'card' do
-          xml.tag! 'accountNumber', credit_card.number
+          xml.tag! 'accountNumber', credit_card.number if include_account_number
           xml.tag! 'expirationMonth', format(credit_card.month, :two_digits)
           xml.tag! 'expirationYear', format(credit_card.year, :four_digits)
           xml.tag!('cvNumber', credit_card.verification_value) unless (@options[:ignore_cvv] || credit_card.verification_value.blank? )

@@ -1,5 +1,4 @@
 require File.join(File.dirname(__FILE__), '../../test_helper')
-require 'ruby-debug'
 
 class CyberSourceTest < Test::Unit::TestCase
   def setup
@@ -220,6 +219,17 @@ class CyberSourceTest < Test::Unit::TestCase
 
     assert_success response
     assert response.test?
+  end
+  
+  def test_successful_update_request_includes_card_info_except_number
+    @gateway.expects(:ssl_post).with do |arg1, request_body|
+      request_body.include?('cvNumber') &&
+      request_body.include?('expirationMonth') &&
+      request_body.include?('expirationYear') &&
+      request_body.include?('cardType') &&
+      !request_body.include?('accountNumber')
+    end
+    response = @gateway.update("2605522582930008402433", @options.merge(:credit_card => @credit_card))
   end
 
   def test_unsuccessful_update_request
